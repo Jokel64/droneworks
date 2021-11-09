@@ -1,0 +1,38 @@
+## Backend ignore
+/.pio
+/build
+sdkconfig
+sdkconfig.old
+/.vscode
+
+
+## Frontend ignore
+/frontend/.DS_Store
+/frontend/node_modules
+/frontend/dist
+/frontend/.idea
+
+
+# local env files
+/frontend/.env.local
+/frontend/.env.*.local
+
+# Log files
+/frontend/npm-debug.log*
+/frontend/yarn-debug.log*
+/frontend/yarn-error.log*
+/frontend/pnpm-debug.log*
+
+# Editor directories and files
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.ipynb_checkpoints
+venv
+
+# Doxygen Ignore
+/html
+/latex
