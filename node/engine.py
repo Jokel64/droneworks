@@ -85,6 +85,7 @@ class C3d:
     def close_to_zero(self, epsilon):
         return abs(self.x) < epsilon and abs(self.y) < epsilon and abs(self.z) < epsilon
 
+
 class World:
     def __init__(self, weight: float, start_position: C3d, max_drone_force: C3d, fps=100, cw_a_rho=0.3):
         self.weight = weight
@@ -126,7 +127,7 @@ class World:
 
             sleeptime = 1/self.fps - runtime
             if sleeptime < 0:
-                print("Overloaded!!!")
+                logging.error("The physics simulation is overloaded. Please buy better hardware. Thanks.")
             else:
                 time.sleep(1/self.fps - runtime)
 
@@ -142,12 +143,13 @@ class World:
         throttle.min_max_norm(1)
         self.force_lock.acquire()
         self._force = copy.deepcopy(self.max_drone_force) * copy.deepcopy(throttle)
-        #logging.debug(f"force: {self._force}")
         self.force_lock.release()
 
+
 class FlightController:
-    # (k_d^2)/4 > k_p
-    def __init__(self, world_ref: World, start_destination: C3d, k_p=10, k_i=0.01, k_d=-3, update_interval=0.1): #k_p=0.02, k_i=0.0001, k_d=-0.3    k_p=0.6, k_i=0.001, k_d=-1.5  k_p=0.5, k_i=0, k_d=-2
+    # In order to ensure a stable system choose (k_d^2)/4 > k_p
+    # Other values: k_p=0.02, k_i=0.0001, k_d=-0.3    k_p=0.6, k_i=0.001, k_d=-1.5  k_p=0.5, k_i=0, k_d=-2
+    def __init__(self, world_ref: World, start_destination: C3d, k_p=10, k_i=0.01, k_d=-3, update_interval=0.1):
         self.world = world_ref
         self.k_p = k_p
         self.k_i = k_i
