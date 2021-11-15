@@ -2,6 +2,7 @@ import copy
 import logging
 import threading
 import time
+import numpy as np
 
 logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadName)s %(message)s')
 
@@ -76,6 +77,9 @@ class C3d:
             self.z = self.z**2
         return self
 
+    def to_numpy_array(self):
+        return np.array([self.x, self.y, self.z])
+
     def __str__(self):
         return f"X: {self.x}\tY: {self.y}\tZ: {self.z}"
 
@@ -87,7 +91,7 @@ class C3d:
 
 
 class World:
-    def __init__(self, weight: float, start_position: C3d, max_drone_force: C3d, fps=100, cw_a_rho=0.3):
+    def __init__(self, weight: float, start_position: C3d, max_drone_force: C3d, fps=100, cw_a_rho=0.3, disable_logging=False):
         self.weight = weight
         self.max_drone_force = max_drone_force
         self.position = start_position
@@ -99,6 +103,7 @@ class World:
         self.thread = None
         self.force_lock = threading.Lock()
         self.do_logging = True
+        self.global_logging_disabled = disable_logging
 
     def __loop(self):
         counter = 0
@@ -116,7 +121,7 @@ class World:
 
             runtime = (time.time()-timestamp)
             if counter > 10:
-                if self.do_logging:
+                if self.do_logging and not self.global_logging_disabled:
                     logging.info(f"Acceleration: X: {round(self.acceleration.x, ndigits=5)} | Y: {round(self.acceleration.y, ndigits=5)} "
                                  f"| Z: {round(self.acceleration.z, ndigits=5)} |||  Velocity X: {round(self.velocity.x, ndigits=3)} | Y: {round(self.velocity.y, ndigits=3)} | "
                                 f"Z: {round(self.velocity.z, ndigits=3)} ||| Position X: {round(self.position.x, ndigits=3)} | "
