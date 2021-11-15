@@ -17,7 +17,7 @@ n_drones = 97
 w_list = []
 fc_list = []
 for i in range(n_drones):
-    world = World(max_drone_force=C3d(1.5, 1.5, 1.5), weight=0.2, start_position=C3d(0, 0, 0), disable_logging=True)
+    world = World(max_drone_force=C3d(1.5, 1.5, 0.1), weight=0.2, start_position=C3d(0, 0, np.random.uniform(-20, 20)), disable_logging=True)
     w_list.append(world)
     fc = FlightController(world_ref=world, start_destination=C3d(0, 0, 0))
     fc_list.append(fc)
@@ -67,7 +67,10 @@ def update_bar_chart(n_interval):
     for i in range(n_drones):
         coords.append(w_list[i].position.to_numpy_array())
     arr = np.array(coords)
-    fig = px.scatter(x=arr[:, 0], y=arr[:, 1], width=1500, height=1200, range_y=[0,60], range_x=[0, 75])
+    # Change between 2D and 3D
+    #fig = px.scatter(x=arr[:, 0], y=arr[:, 1], width=1500, height=1200, range_y=[0,60], range_x=[0, 75])
+    fig = px.scatter_3d(x=arr[:, 0], y=arr[:, 1], z=arr[:, 2], width=1500, height=1200, range_y=[0,60], range_x=[0, 75], range_z=[-25, 25])
+    fig['layout']['uirevision'] = 'False'
     return fig
 
 app.run_server(debug=True)
