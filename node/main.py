@@ -1,4 +1,7 @@
 import logging
+import uuid
+
+from middleware.communication import CommunicationController, MulticastReceiver, MulticastSender
 
 from restapi import RestApi
 from flask import Flask
@@ -20,6 +23,9 @@ RestApi.set_super_references(world=world, fc=fc)
 
 
 world.run_simulation()
-fc.run_controller()
 
+fc.run_controller()
 fc.go_to_point(C3d(0, 0, 0))
+
+#Communication Implementation
+com_controller = CommunicationController(uuid.uuid4(), fc)
