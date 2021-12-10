@@ -5,6 +5,7 @@ import time
 import dash
 from dash import dcc
 from dash import html
+import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output
 import plotly.express as px
 
@@ -50,14 +51,71 @@ FC_thread = threading.Thread(target=positions)
 FC_thread.start()
 
 # Plotly dash server
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-app.layout = html.Div([
-    dcc.Graph(id="scatter-plot"),
-    dcc.Interval(
-        id='interval-component',
-        interval=1 * 100)
-])
+control = dbc.Card(
+    [
+        html.H2("Control", className="card-title"),
+        html.Div(
+            [
+                dbc.Label("Shape Selector"),
+                dcc.Dropdown(
+                    id="dropdown_shape",
+                    options=[
+                        {'label': 'Star', 'value': 'shape_star'},
+                        {'label': 'Ellipse', 'value': 'shape_ellipse'}
+                    ],
+                    value='shape_star'
+                )
+            ]
+        )
+    ],
+    body=True,
+    color="primary",
+    outline=True,
+)
+
+data = dbc.Card(
+    [
+        html.H2("Data", className="card-title"),
+        html.Div(
+            [
+                html.P(id="current_shape")
+            ]
+        ),
+    ],
+    body=True,
+    color="secondary",
+    outline=True,
+)
+
+graph = dbc.Card(
+    [
+
+        html.H2("Drone Position Visualisation", className="card-title"),
+        dcc.Graph(id="scatter-plot"),
+        dcc.Interval(
+            id='interval-component',
+            interval=1 * 100)
+    ],
+    body=True,
+)
+
+app.layout = dbc.Container(
+    [
+        html.H1("Droneworks Control Center"),
+        html.Hr(),
+        dbc.Row(
+            [
+                dbc.Col(graph, md=8),
+                dbc.Col(control, md=2),
+                dbc.Col(data, md=2)
+            ],
+            align="center",
+        ),
+    ],
+    fluid=True,
+)
 
 @app.callback(
     Output("scatter-plot", "figure"),
@@ -72,5 +130,12 @@ def update_bar_chart(n_interval):
     fig = px.scatter_3d(x=arr[:, 0], y=arr[:, 1], z=arr[:, 2], width=1500, height=1200, range_y=[0,60], range_x=[0, 75], range_z=[-25, 25])
     fig['layout']['uirevision'] = 'False'
     return fig
+
+@app.callback(
+    Output("current_shape", "children"),
+    Input("dropdown_shape", "value")
+)
+def update_output(value):
+    return 'Currently Selected Shape: "{}"'.format(value)
 
 app.run_server(debug=True)
