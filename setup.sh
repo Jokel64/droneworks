@@ -1,0 +1,4 @@
+export DRONEWORKS_DOCKER_IMAGE_NAME="dw-node"
+export DRONEWORKS_NUM_NODES=9
+
+docker build -t $DRONEWORKS_DOCKER_IMAGE_NAME ./node
