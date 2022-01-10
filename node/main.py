@@ -1,31 +1,47 @@
 import logging
-import uuid
+import time
 
-from middleware.communication import CommunicationController, MulticastReceiver, MulticastSender
+from node import DWNode
+from flask import Flask, request
+import json
 
-from restapi import RestApi
-from flask import Flask
-from flask_cors import CORS
-from engine import World, FlightController, C3d
-from time import sleep
+from engine import C3d
+
+node = DWNode()
 
 app = Flask(__name__)
 
-world = World(max_drone_force=C3d(1.5, 1.5, 1.5), weight=0.2, start_position=C3d(0, 0, 0))
-fc = FlightController(world_ref=world, start_destination=C3d(0, 0, 0))
+port=3300
+@app.route("/", methods=["POST"])
+def index_post():
+    x = float(request.form["x"])
+    y = float(request.form["y"])
+    z = float(request.form["z"])
+    node.flight_controller.go_to_point(C3d(x, y, z))
+    return index_get()
 
-RestApi.register(app, route_base='/')
-# enable CORS
-CORS(app, resources={r'/*': {'origins': '*'}})
+@app.route("/", methods=["GET"])
+def index_get():
+    entries = ""
+    for key, val in vars(node).items():
+        if key == "node_list":
+            buf = ""
+            for k, v in val.items():
+                last_alive_sec_ago = time.time() - v['last_alive']
 
-# Sets all references the rest api needs access to. A bit hacky.
-RestApi.set_super_references(world=world, fc=fc)
+                buf += f"IP: <a href=\"http://{v['ip']}:{port}\">{v['ip']}</a> | Last Alive " \
+                       f"{round(last_alive_sec_ago, ndigits=5)}s ago | Leader: {v['leader']} | UUID: {v['uuid']}<br>"
+            val = buf
+        entries += f"<tr><td>{key}</td><td>{val}</td></tr>"
 
+    return f"""<!DOCTYPE html><html><head><style>
+table, form {{font-family: arial, sans-serif;border-collapse: collapse;width: 100%;}}
+td, th {{border: 1px solid #dddddd;text-align: left;padding: 8px;}}
+tr:nth-child(even) {{background-color: #dddddd;}}
+</style></head><body><h2>{node.readable_name} [{node.ip}]</h2><table><tr><th>Key</th><th>Value</th>
+  </tr>{entries}</table><form method="POST"><br><b>Go to destination manually</b><br>X:<input type="number" name="x" value=0> 
+  Y:<input type="number" name="y" value=0> Z:<input type="number" name="z" value=0> 
+  <input type="submit" name="new_dest" value="Go"></form></body></html>"""
 
-world.run_simulation()
-
-fc.run_controller()
-fc.go_to_point(C3d(0, 0, 0))
-
-#Communication Implementation
-com_controller = CommunicationController(uuid.uuid4(), fc)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=port)
