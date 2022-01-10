@@ -26,7 +26,7 @@ class MulticastReceiver:
             self.Address = Multicast_Address
             self.Port = Multicast_Port
             self.CommunicationController = CommunicationController
-            self.stopReceiving = False;
+            self.stopReceiving = False
 
         def initializeCommunication(self):
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -35,17 +35,17 @@ class MulticastReceiver:
             mreq = struct.pack("=4sl", socket.inet_aton("224.1.1.1"), socket.INADDR_ANY)
             self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-        def runReceiverLoop(self):
+        def runReceiverLoop(self, cb):
             while (not self.stopReceiving):
                 msg_recived = self.sock.recv(10240)
                 msg_recived = str(msg_recived,encoding)
                 msg_recived = json.loads(msg_recived, object_hook=lambda d: SimpleNamespace(**d))
-                logging.debug(f"Message arrived: Type:{msg_recived.messageType}, Body:{msg_recived.messageBody}")
+                cb(msg_recived)
 
 
-        def startReceiving(self):
+        def startReceiving(self, cb):
             self.initializeCommunication()
-            thread = threading.Thread(target=self.runReceiverLoop, args=(), kwargs={})
+            thread = threading.Thread(target=self.runReceiverLoop, args=(cb, ), kwargs={})
             thread.start()
             logging.debug("Reactor Running")
 
@@ -80,6 +80,10 @@ class Message:
         self.messageBody = messageBody
 
 
+class MessageTypes:
+    heartbeat = "hb"
+
+
 """
 This Class contains all logic regarding dynamic discovery of hosts.
 *
@@ -91,7 +95,7 @@ class DynamicDiscoveryHandler:
 
     def getIpAddressForID(self, ID):
         message = Message()
-        message.messageType = "0"                       # 0=> DiscoveryAsk
+        message.messageType = MessageTypes.heartbeat
         message.messageBody = ID
         self.MulticastSender.sendMessage(message)
 
@@ -106,9 +110,10 @@ class DynamicDiscoveryHandler:
 
     def BrodcastIdAndAddress(self, ID, Address):
         message = Message()
-        message.messageType = "1"                       # 1=> DiscoveryBrodcast
+        message.messageType = MessageTypes.heartbeat                       # 1=> DiscoveryBrodcast
         message.messageBody = f"{ID},{Address}"
         self.MulticastSender.sendMessage(message)
+
 
 def RunScheduler():
     while True:

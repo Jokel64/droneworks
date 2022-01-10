@@ -8,4 +8,7 @@ Edit the exports in setup.sh to change the number of drones.
 
 To start all drones run ```bash run.sh```
 
+To start a single drone in dev mode (container is permanent) run ```bash dev.sh```
+
 To stop all drones run ```bash stop.sh```
+

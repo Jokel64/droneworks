@@ -4,7 +4,7 @@ import threading
 import time
 import numpy as np
 
-logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadName)s %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(relativeCreated)6d %(threadName)s %(message)s')
 
 class C3d:
     def __init__(self, x: float, y: float, z: float):
@@ -105,6 +105,9 @@ class World:
         self.do_logging = True
         self.global_logging_disabled = disable_logging
 
+    def __str__(self):
+        return f"Position: {self.position}<br>Velocity: {self.velocity}<br>Acceleration: {self.acceleration}"
+
     def __loop(self):
         counter = 0
         while True:
@@ -122,7 +125,7 @@ class World:
             runtime = (time.time()-timestamp)
             if counter > 10:
                 if self.do_logging and not self.global_logging_disabled:
-                    logging.info(f"Acceleration: X: {round(self.acceleration.x, ndigits=5)} | Y: {round(self.acceleration.y, ndigits=5)} "
+                    logging.debug(f"Acceleration: X: {round(self.acceleration.x, ndigits=5)} | Y: {round(self.acceleration.y, ndigits=5)} "
                                  f"| Z: {round(self.acceleration.z, ndigits=5)} |||  Velocity X: {round(self.velocity.x, ndigits=3)} | Y: {round(self.velocity.y, ndigits=3)} | "
                                 f"Z: {round(self.velocity.z, ndigits=3)} ||| Position X: {round(self.position.x, ndigits=3)} | "
                                 f"Y: {round(self.position.y, ndigits=3)} | Z: {round(self.position.z, ndigits=3)} | Runtime[ms]: {runtime*1000}")
@@ -163,6 +166,9 @@ class FlightController:
         self.update_interval = update_interval
         self.thread = None
         self.arrived_at_destination = False
+
+    def __str__(self):
+        return f"Destination: {self.destination}<br>Arrived at Destination: {self.arrived_at_destination}"
 
     def go_to_point(self, destination: C3d):
         self.destination = destination
