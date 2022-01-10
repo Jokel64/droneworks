@@ -122,27 +122,6 @@ def RunScheduler():
         schedule.run_pending()
         time.sleep(0.1)
 
-"""
-This Class reacts to all communication and redirects information to the other components
-"""
-class CommunicationController:
-    def __init__(self,id, flightController):
-        self.id = id
-        self.flightController = flightController
-        self.multicast_reciver = MulticastReceiver(MCAST_GRP, MCAST_PORT, self)
-        self.multicast_reciver.startReceiving()
-        self.multicast_sender = MulticastSender(MCAST_GRP, MCAST_PORT)
-        self.dynamicDiscoveryHandler = DynamicDiscoveryHandler(self.multicast_sender)
-        self.dynamicDiscoveryHandler.startBrodcastIdAndAddress(self.id,getCurrentIpAddress())
-
-        threading.Thread(target=RunScheduler).run()
-
-    def incomingMessage(self, message):
-        if(message.messageType == "0"):
-            print("Brdcast Received")
-        if(message.messageType == "1"):
-            print("Ask Received")
-
 
 
 

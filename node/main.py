@@ -3,7 +3,6 @@ import time
 
 from node import DWNode
 from flask import Flask, request
-import json
 
 from engine import C3d
 
@@ -28,13 +27,13 @@ def index_get():
             buf = ""
             for k, v in val.items():
                 last_alive_sec_ago = time.time() - v['last_alive']
-
-                buf += f"IP: <a href=\"http://{v['ip']}:{port}\">{v['ip']}</a> | Last Alive " \
-                       f"{round(last_alive_sec_ago, ndigits=5)}s ago | Leader: {v['leader']} | UUID: {v['uuid']}<br>"
+                offline = not v['online']
+                buf += f"<span style=\"{'color: red' if offline else ''}\">IP: <a href=\"http://{v['ip']}:{port}\">{v['ip']}</a> | Last Alive " \
+                       f"{round(last_alive_sec_ago, ndigits=5)}s ago | Leader: {v['leader']} | UUID: {v['uuid']} {'[OFFLINE]' if offline else ''}</span><br>"
             val = buf
         entries += f"<tr><td>{key}</td><td>{val}</td></tr>"
 
-    return f"""<!DOCTYPE html><html><head><style>
+    return f"""<!DOCTYPE html><html><head><style>offline ? ''
 table, form {{font-family: arial, sans-serif;border-collapse: collapse;width: 100%;}}
 td, th {{border: 1px solid #dddddd;text-align: left;padding: 8px;}}
 tr:nth-child(even) {{background-color: #dddddd;}}

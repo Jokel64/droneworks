@@ -12,6 +12,7 @@ import names
 
 from engine import World, FlightController, C3d
 import random
+from dash_wrapper import t_dash_interface
 
 lg.basicConfig(level=lg.INFO, format='%(relativeCreated)6d %(threadName)s %(message)s')
 
@@ -55,11 +56,13 @@ class DWNode:
         # Threads
         self.heartbeat_thread = threading.Thread(target=self._t_heartbeat)
         self.leader_thread = threading.Thread(target=self._t_leader_control_and_node_garbage_collection)
+        self.dash_thread = threading.Thread(target=t_dash_interface)
 
         # Start Threads
         self.heartbeat_thread.start()
         self.leader_thread.start()
         self.mc_rec.startReceiving(self.cb_multicast_message_received_handler)
+        self.dash_thread.start()
 
         self.world.run_simulation()
         self.flight_controller.run_controller()
@@ -83,7 +86,7 @@ class DWNode:
             leader_found = False
             for node in self.node_list:
                 if not self.node_still_online(node):
-                    del self.node_list[node]
+                    self.node_list[node]["online"] = False
 
                 if self.node_list[node]["leader"]:
                     self.leader_uuid = node
@@ -115,5 +118,7 @@ class DWNode:
             self.node_list[id]["last_alive"] = time.time()
             self.node_list[id]["uuid"] = id
             self.node_list[id]["leader"] = False
+            self.node_list[id]["online"] = True
+
         else:
             lg.error(f'Message Type "{msg_received.messageType}" unknown.')

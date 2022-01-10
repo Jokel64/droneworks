@@ -2,11 +2,11 @@ import logging
 import threading
 import time
 
-import dash
-from dash import dcc
-from dash import html
+import dash_wrapper
+from dash_wrapper import dcc
+from dash_wrapper import html
 import dash_bootstrap_components as dbc
-from dash.dependencies import Input, Output
+from dash_wrapper.dependencies import Input, Output
 import plotly.express as px
 
 import numpy as np
