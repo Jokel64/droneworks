@@ -6,7 +6,10 @@ from dash.dependencies import Input, Output
 import numpy as np
 import plotly.express as px
 
+
 _app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+
+node_list_ref = None
 
 control = dbc.Card(
     [
@@ -76,6 +79,7 @@ _app.layout = dbc.Container(
     Output("scatter-plot", "figure"),
     [Input("interval-component", 'n_intervals')])
 def _update_bar_chart(n_interval):
+    global node_list_ref
     coords = []
     #for i in range(n_drones):
     #    coords.append(w_list[i].position.to_numpy_array())
@@ -95,3 +99,7 @@ def _update_output(value):
 
 def t_dash_interface():
     _app.run_server(debug=False, host="0.0.0.0")
+
+def set_node_list(node_list):
+    global node_list_ref
+    node_list_ref = node_list

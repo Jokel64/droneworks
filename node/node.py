@@ -12,7 +12,8 @@ import names
 
 from engine import World, FlightController, C3d
 import random
-from dash_wrapper import t_dash_interface
+from dash_wrapper import t_dash_interface, set_node_list
+from middleware.communication import Message
 
 lg.basicConfig(level=lg.INFO, format='%(relativeCreated)6d %(threadName)s %(message)s')
 
@@ -28,7 +29,7 @@ class DWNode:
         self.node_offline_timeout_s = node_offline_timeout_s
 
         # Other Properties
-        self.uuid = uuid.uuid4()
+        self.uuid = str(uuid.uuid4())
         self.readable_name = names.get_full_name()
         self.node_list = dict()
         self.is_leader = False
@@ -73,9 +74,14 @@ class DWNode:
     def _t_heartbeat(self):
         while True:
             self.ip = getCurrentIpAddress()
-            self.ddh.BrodcastIdAndAddress(self.uuid, getCurrentIpAddress())
+            message = Message()
+            message.messageType = MessageTypes.heartbeat
+            message.messageBody = {"ip": self.ip, "uuid": self.uuid, "pos": str(self.world.position),
+                                   "vel": str(self.world.velocity), "acc": str(self.world.acceleration)}
+            self.mc_sender.sendMessage(message)
+
+            # self.ddh.BrodcastIdAndAddress(self.uuid, getCurrentIpAddress())
             time.sleep(self.heartbeat_rate_s)
-            False
 
     """
     This thread checks whether a leader is present in the network and initiates the election process if not.
@@ -108,17 +114,20 @@ class DWNode:
         return time.time() - self.node_list[node_uuid]["last_alive"] < self.node_offline_timeout_s
 
     def cb_multicast_message_received_handler(self, msg_received):
-        #print(f"Message arrived: Type:{msg_recived.messageType}, Body:{msg_recived.messageBody}")
+
         if msg_received.messageType == MessageTypes.heartbeat:
-            split = msg_received.messageBody.split(",")
-            id = split[0]
-            ip = split[1]
-            self.node_list[id] = dict()
-            self.node_list[id]["ip"] = ip
-            self.node_list[id]["last_alive"] = time.time()
-            self.node_list[id]["uuid"] = id
-            self.node_list[id]["leader"] = False
-            self.node_list[id]["online"] = True
+            uid = msg_received.messageBody.uuid
+            self.node_list[uid] = dict()
+            self.node_list[uid]["ip"] = msg_received.messageBody.ip
+            self.node_list[uid]["last_alive"] = time.time()
+            self.node_list[uid]["uuid"] = msg_received.messageBody.uuid
+            self.node_list[uid]["pos"] = msg_received.messageBody.pos
+            self.node_list[uid]["vel"] = msg_received.messageBody.vel
+            self.node_list[uid]["acc"] = msg_received.messageBody.acc
+
+            self.node_list[uid]["leader"] = False
+            self.node_list[uid]["online"] = True
+            set_node_list(self.node_list)
 
         else:
             lg.error(f'Message Type "{msg_received.messageType}" unknown.')
