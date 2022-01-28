@@ -7,5 +7,6 @@ plotly
 pandas
 matplotlib
 svg.path
+numpy
 
 schedule

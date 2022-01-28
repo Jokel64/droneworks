@@ -2,10 +2,12 @@ import threading
 import socket
 import struct
 import json
-import logging
+import logging as lg
 
 import schedule
 import time
+import uuid
+import names
 
 from types import SimpleNamespace
 
@@ -14,56 +16,211 @@ encoding = 'utf-8'
 MCAST_GRP = '224.1.1.1'
 
 MCAST_PORT = 5007
+node_offline_timeout_s = 3
 
-heartbeat_in_seconds = 10
+"""
+Information about a peer
+"""
+class Peer:
+    def __init__(self, uid, origin_ip, is_leader=False, **kwargs):
+        self.uid = uid
+        self.ip = origin_ip
+        self.is_leader = is_leader
+        self.last_alive = time.time()
+
+    def __str__(self):
+        buf = ""
+        if self.is_leader:
+            buf += "[leader] "
+        if self.is_online():
+            buf += "[online]"
+        else:
+            buf += "[offline]"
+        return buf
+
+    def is_online(self):
+        return time.time() - self.last_alive < node_offline_timeout_s
+
+"""
+Main class
+"""
+class Middleware:
+    def __init__(self, cb_message_received, cb_heartbeat_payload=None, heartbeat_rate_s=1, leader_control_rate_s=2):
+        # Error checks
+        if heartbeat_rate_s >= node_offline_timeout_s:
+            ValueError("Heartbeat rate must be faster than the node offline_timeout")
+
+        # Settings
+        self.heartbeat_rate_s = heartbeat_rate_s
+        self.leader_control_rate_s = leader_control_rate_s
+
+        # Other Properties
+        self.uid = str(uuid.uuid4())
+        self.readable_name = names.get_full_name()
+        self.peer_list = dict()
+        self.is_leader = False
+        self.leader_peer = None
+
+        # External callback methods (API)
+        self.ext_cb_heartbeat_payload = cb_heartbeat_payload
+        self.ext_cb_message_received = cb_message_received
+
+
+        # Empty Initializations
+        self.ip = getCurrentIpAddress()
+
+        # Network Interfaces
+        self.mc_sender = MWSender(MCAST_GRP, MCAST_PORT, None, self.uid)
+        self.mc_rec = MulticastReceiver(MCAST_GRP, MCAST_PORT, self.cb_message_received)
+
+        # Threads
+        self.heartbeat_thread = threading.Thread(target=self._t_heartbeat, args=(self.ext_cb_heartbeat_payload,), kwargs={})
+        self.leader_thread = threading.Thread(target=self._t_leader_control_and_node_garbage_collection)
+
+        # Start Threads
+        self.heartbeat_thread.start()
+        self.leader_thread.start()
+
+    def __str__(self):
+        entries = "<table>"
+        for k, v in vars(self).items():
+            ve = f"{v}".replace("<", " ").replace(">", " ")
+            entries += f"<tr><td>{k}</td><td>{ve}</td></tr>"
+        return entries + "</table>"
+
+    def cb_message_received(self, msg):
+        uid = msg.header['uid']
+        self.peer_list[uid] = Peer(**msg.header)
+        try:
+            self.ext_cb_message_received(msg)
+        except Exception as e:
+            lg.error(f'message received callback function failed: {e}')
+
+    """
+    This thread sends out the heartbeat at the rate of self.heartbeat_rate_s
+    """
+    def _t_heartbeat(self, cb_heartbeat_payload):
+        while True:
+            if cb_heartbeat_payload is not None:
+                try:
+                    message_body = cb_heartbeat_payload()
+                except Exception as e:
+                    lg.error(f'heartbeat payload callback function failed: {e}')
+                    message_body = {"body": "error at cb function"}
+
+            else:
+                message_body = {"body": "not specified"}
+            self.mc_sender.send_message_multicast(message_body, {'type': DefaultMessageTypes.HEARTBEAT})
+            time.sleep(self.heartbeat_rate_s)
+
+    """
+    This thread checks whether a leader is present in the network and initiates the election process if not.
+    It also throws out every node from the node_list that has had a timeout.
+    """
+
+    def _t_leader_control_and_node_garbage_collection(self):
+        while True:
+            leader_found = False
+            for uid, peer in self.peer_list.items():
+                if peer.is_leader and peer.is_online():
+                    self.leader_peer = peer
+                    leader_found = True
+                    break
+
+            # No leader found
+            if not leader_found:
+                self.leader_peer = None
+                lg.info("No leader found. Init leader election process.")
+                self._init_leader_election()
+
+            time.sleep(self.leader_control_rate_s)
+
+    def _init_leader_election(self):
+
+        pass
+
+
 
 
 """
 This Class wraps some basic Receive Functionalities around the basic OS-Socket Library
 """
 class MulticastReceiver:
-        def __init__(self, Multicast_Address, Multicast_Port, CommunicationController):
+        def __init__(self, Multicast_Address, Multicast_Port, cb_message_received):
             self.Address = Multicast_Address
             self.Port = Multicast_Port
-            self.CommunicationController = CommunicationController
             self.stopReceiving = False
+            self._start_receiving(cb_message_received)
 
-        def initializeCommunication(self):
+        def _initialize_communication(self):
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.sock.bind(('', self.Port))
             mreq = struct.pack("=4sl", socket.inet_aton("224.1.1.1"), socket.INADDR_ANY)
             self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-        def runReceiverLoop(self, cb):
+        def _t_run_receiver_loop(self, cb):
             while (not self.stopReceiving):
-                msg_recived = self.sock.recv(10240)
-                msg_recived = str(msg_recived,encoding)
-                msg_recived = json.loads(msg_recived, object_hook=lambda d: SimpleNamespace(**d))
-                cb(msg_recived)
+                msg_received = self.sock.recv(10240)
+                msg_received = str(msg_received, encoding)
+                #msg_received = json.loads(msg_received, object_hook=lambda d: SimpleNamespace(**d))
+                msg_received = json.loads(msg_received)
+                msg_received = Message(**msg_received)
+                cb(msg_received)
 
 
-        def startReceiving(self, cb):
-            self.initializeCommunication()
-            thread = threading.Thread(target=self.runReceiverLoop, args=(cb, ), kwargs={})
+        def _start_receiving(self, cb):
+            self._initialize_communication()
+            thread = threading.Thread(target=self._t_run_receiver_loop, args=(cb,), kwargs={})
             thread.start()
-            logging.debug("Reactor Running")
+            lg.debug("Reactor Running")
 
         def shutdownReceiver(self):
             self.stopReceiving = True
 
+class Message:
+    def __init__(self, header, body):
+        self.header = header
+        self.body = body
 
-class MulticastSender:
-    def __init__(self, MulticastAddr, Port):
-        self.Addr = MulticastAddr
-        self.Port = Port
+class MWSender:
+    def __init__(self, multicast_addr, port, additional_default_headers, uid):
+        self.multicast_addr = multicast_addr
+        self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+        if additional_default_headers is None:
+            self.additional_default_headers = {}
+        else:
+            self.additional_default_headers = additional_default_headers
+        self.uid = uid
 
-    def sendMessage(self, message):
-        messageString = json.dumps(message.__dict__)
-        self.sock.sendto(messageString.encode(), (self.Addr, self.Port))
-        logging.debug(f"Message send: {messageString}")
+    def _generate_default_header(self, destination_ip):
+        return self.additional_default_headers | {'origin_ip': getCurrentIpAddress(), 'destination_ip': destination_ip,
+                                                  'uid': self.uid}
+
+    def send_message_multicast(self, message_body, custom_headers):
+        if custom_headers is None:
+            custom_headers = {}
+
+        msg = Message(header=custom_headers | self._generate_default_header(self.multicast_addr), body=message_body)
+        msg_str = json.dumps(msg.__dict__)
+
+        self.sock.sendto(msg_str.encode(), (self.multicast_addr, self.port))
+        lg.debug(f"Message send mc: {msg_str}")
+
+    def send_message_unicast(self, destination_ip, message_body, custom_headers):
+        if custom_headers is None:
+            custom_headers = {}
+
+        msg = Message(self._generate_default_header(destination_ip) | custom_headers, message_body)
+        msg_str = json.dumps(msg.__dict__)
+        self.sock.sendto(msg_str.encode(), (self.multicast_addr, self.port))
+        lg.debug(f"Message send uc: {msg_str}")
+
+
+class DefaultMessageTypes:
+    HEARTBEAT = "heartbeat"
 
 
 """
@@ -74,53 +231,6 @@ def getCurrentIpAddress():
     IP_addres = socket.gethostbyname(h_name)
     return IP_addres
 
-class Message:
-    def __int__(self, messageType, messageBody):
-        self.messageType = messageType
-        self.messageBody = messageBody
-
-
-class MessageTypes:
-    heartbeat = "hb"
-
-
-"""
-This Class contains all logic regarding dynamic discovery of hosts.
-*
-"""
-class DynamicDiscoveryHandler:
-    def __init__(self, MulticastSender):
-        self.IpLookupList = {1:'192.168.2.1', 2:'123.123.123.123'}
-        self.MulticastSender = MulticastSender
-
-    def getIpAddressForID(self, ID):
-        message = Message()
-        message.messageType = MessageTypes.heartbeat
-        message.messageBody = ID
-        self.MulticastSender.sendMessage(message)
-
-    def startBrodcastIdAndAddress(self, ID, Address):
-        schedule.every(heartbeat_in_seconds).seconds.do(lambda: self.BrodcastIdAndAddress(ID,Address))
-        schedule.run_pending()
-        while True:
-            # Checks whether a scheduled task
-            # is pending to run or not
-            schedule.run_pending()
-            time.sleep(1)
-
-    def BrodcastIdAndAddress(self, ID, Address):
-        message = Message()
-        message.messageType = MessageTypes.heartbeat                       # 1=> DiscoveryBrodcast
-        message.messageBody = f"{ID},{Address}"
-        self.MulticastSender.sendMessage(message)
-
-
-def RunScheduler():
-    while True:
-        # Checks whether a scheduled task
-        # is pending to run or not
-        schedule.run_pending()
-        time.sleep(0.1)
 
 
 

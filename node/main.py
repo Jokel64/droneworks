@@ -11,6 +11,9 @@ node = DWNode()
 app = Flask(__name__)
 
 port=3300
+
+
+
 @app.route("/", methods=["POST"])
 def index_post():
     x = float(request.form["x"])
@@ -26,10 +29,11 @@ def index_get():
         if key == "node_list":
             buf = ""
             for k, v in val.items():
-                last_alive_sec_ago = time.time() - v['last_alive']
-                offline = not v['online']
-                buf += f"<span style=\"{'color: red' if offline else ''}\">IP: <a href=\"http://{v['ip']}:{port}\">{v['ip']}</a> | Last Alive " \
-                       f"{round(last_alive_sec_ago, ndigits=5)}s ago | Leader: {v['leader']} | UUID: {v['uuid']} {'[OFFLINE]' if offline else ''}</span><br>"
+                peer = v['peer']
+                last_alive_sec_ago = time.time() - peer.last_alive
+                offline = not peer.is_online()
+                buf += f"<span style=\"{'color: red' if offline else ''}\">IP: <a href=\"http://{peer.ip}:{port}\">{peer.ip}</a> | Last Alive " \
+                       f"{round(last_alive_sec_ago, ndigits=5)}s ago | Leader: {peer.is_leader} | UUID: {peer.uid} {'[OFFLINE]' if offline else ''}</span><br>"
             val = buf
         entries += f"<tr><td>{key}</td><td>{val}</td></tr>"
 
@@ -37,7 +41,7 @@ def index_get():
 table, form {{font-family: arial, sans-serif;border-collapse: collapse;width: 100%;}}
 td, th {{border: 1px solid #dddddd;text-align: left;padding: 8px;}}
 tr:nth-child(even) {{background-color: #dddddd;}}
-</style></head><body><h2>{node.readable_name} [{node.ip}]</h2><table><tr><th>Key</th><th>Value</th>
+</style></head><body><h2>{node.readable_name} [{node.middleware.ip}]</h2><table><tr><th>Key</th><th>Value</th>
   </tr>{entries}</table><form method="POST"><br><b>Go to destination manually</b><br>X:<input type="number" name="x" value=0> 
   Y:<input type="number" name="y" value=0> Z:<input type="number" name="z" value=0> 
   <input type="submit" name="new_dest" value="Go"></form></body></html>"""

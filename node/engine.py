@@ -4,7 +4,6 @@ import threading
 import time
 import numpy as np
 
-logging.basicConfig(level=logging.INFO, format='%(relativeCreated)6d %(threadName)s %(message)s')
 
 class C3d:
     def __init__(self, x: float, y: float, z: float):
