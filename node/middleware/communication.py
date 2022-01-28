@@ -65,6 +65,8 @@ class Middleware:
         self.ext_cb_heartbeat_payload = cb_heartbeat_payload
         self.ext_cb_message_received = cb_message_received
 
+        # Helper Classes
+        self.leader_election_helper = LeaderElection(mw=self)
 
         # Empty Initializations
         self.ip = getCurrentIpAddress()
@@ -90,7 +92,25 @@ class Middleware:
 
     def cb_message_received(self, msg):
         uid = msg.header['uid']
-        self.peer_list[uid] = Peer(**msg.header)
+
+        if self.peer_list.get(uid) == None:
+            self.peer_list[uid] = Peer(**msg.header)
+
+        #If the peer already exists we only need to update the important values
+        old_peer = self.peer_list[uid]
+        peer_to_merge = Peer(**msg.header)
+
+        old_peer.last_alive = peer_to_merge.last_alive
+        old_peer.ip = peer_to_merge.ip
+
+        self.peer_list[uid] = old_peer
+
+        # Distribute Messages if middleware related
+        if msg.header['type'] == DefaultMessageTypes.LEADER_ELECTION_BRODCAST:
+            self.leader_election_helper.leaderElectionMessageRecived(msg)
+            return
+
+        # If nothing above is applicable route to external controller
         try:
             self.ext_cb_message_received(msg)
         except Exception as e:
@@ -136,9 +156,44 @@ class Middleware:
             time.sleep(self.leader_control_rate_s)
 
     def _init_leader_election(self):
-
+        self.leader_election_helper.brodcastImLeaderMessage()
         pass
 
+"""
+This Class provides basic leader election by using the bully algorithm
+"""
+class LeaderElection:
+    def __init__(self, mw : Middleware):
+        self.middelware = mw
+        self.electionInProgress = False
+        self.lastElectionMessageRecived = time.time()
+
+    def setNewLeader(self,id):
+        for uid, peer in self.middelware.peer_list.items():
+            if uid == id:
+                peer.is_leader = True
+            else:
+                peer.is_leader = False
+
+    def brodcastImLeaderMessage(self):
+        lg.info("Brodcasting election message")
+        self.middelware.mc_sender.send_message_multicast(None, {'type': DefaultMessageTypes.LEADER_ELECTION_BRODCAST})
+        self.electionInProgress = True
+
+    def leaderElectionMessageRecived(self, msg):
+        lg.info("recived election message")
+        self.electionInProgress = True
+        id = msg.header['uid']
+
+        hisID = uuid.UUID(id)
+        myID = uuid.UUID(self.middelware.uid)
+
+        if myID <= hisID:
+            self.setNewLeader(id)
+            lg.info("My id is smaller or equal so he won")
+        else:
+            lg.info("My id is bigger so I'm trying to reelect")
+            self.brodcastImLeaderMessage()
 
 
 
@@ -221,6 +276,7 @@ class MWSender:
 
 class DefaultMessageTypes:
     HEARTBEAT = "heartbeat"
+    LEADER_ELECTION_BRODCAST = "Im_Leader_Now"
 
 
 """
