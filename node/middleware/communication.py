@@ -14,6 +14,7 @@ encoding = 'utf-8'
 MCAST_GRP = '224.1.1.1'
 
 MCAST_PORT = 5007
+UNCAST_PORT = 5008
 node_offline_timeout_s = 3
 
 """
@@ -87,8 +88,9 @@ class Middleware:
         self.ip = getCurrentIpAddress()
 
         # Network Interfaces
-        self.mc_sender = MWSender(MCAST_GRP, MCAST_PORT, None, self.uid)
-        self.mc_rec = MulticastReceiver(MCAST_GRP, MCAST_PORT, self.cb_message_received)
+        self.mc_sender = MWSender(MCAST_GRP, MCAST_PORT, UNCAST_PORT, None, self.uid)
+        self.mc_rec = MulticastReceiver(MCAST_GRP, MCAST_PORT, getCurrentIpAddress(), UNCAST_PORT,
+                                        self.cb_mcast_message_received, self.cb_uncast_message_received)
 
         # Threads
         self.heartbeat_thread = threading.Thread(target=self._t_heartbeat, args=(self.ext_cb_heartbeat_payload,), kwargs={})
@@ -114,7 +116,11 @@ class Middleware:
     def cb_leader_found(self):
         pass
 
-    def cb_message_received(self, msg: Message):
+    def cb_uncast_message_received(self, msg: Message):
+        lg.info(f"Got UN MESSAGE! {msg.header}")
+        pass
+
+    def cb_mcast_message_received(self, msg: Message):
         uid = msg.get_header(DefaultHeaders.UID)
 
         if self.peer_list.get(uid) == None:
@@ -177,34 +183,49 @@ class Middleware:
 This Class wraps some basic Receive Functionalities around the basic OS-Socket Library
 """
 class MulticastReceiver:
-        def __init__(self, Multicast_Address, Multicast_Port, cb_message_received):
-            self.Address = Multicast_Address
-            self.Port = Multicast_Port
+        def __init__(self, Multicast_Address, Multicast_Port, unicast_address, unicast_port, cb_mc, cb_uncast):
+            self.MCAST_ADDR = Multicast_Address
+            self.MCAST_PORT = Multicast_Port
+            self.UNCAST_ADDR = unicast_address
+            self.UNCAST_PORT = unicast_port
             self.stopReceiving = False
-            self._start_receiving(cb_message_received)
 
-        def _initialize_communication(self):
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.sock.bind(('', self.Port))
-            mreq = struct.pack("=4sl", socket.inet_aton("224.1.1.1"), socket.INADDR_ANY)
-            self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+            # Init MCast socket
+            self.mcast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+            self.mcast_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.mcast_sock.bind(('', self.MCAST_PORT))
+            mreq = struct.pack("=4sl", socket.inet_aton(self.MCAST_ADDR), socket.INADDR_ANY)
+            self.mcast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-        def _t_run_receiver_loop(self, cb):
+            # Init Uncast socket
+            self.uncast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.uncast_sock.bind((self.UNCAST_ADDR, self.UNCAST_PORT))
+
+            # Start Threads
+            mcast_thread = threading.Thread(target=self._t_run_mcast_receiver_loop, args=(cb_mc,), kwargs={})
+            mcast_thread.start()
+            uncast_thread = threading.Thread(target=self._t_run_uncast_receiver_loop, args=(cb_uncast,), kwargs={})
+            uncast_thread.start()
+
+            lg.debug("Reactor Running")
+
+        def _t_run_mcast_receiver_loop(self, cb):
             while (not self.stopReceiving):
-                msg_received = self.sock.recv(10240)
+                msg_received = self.mcast_sock.recv(10240)
                 msg_received = str(msg_received, encoding)
                 #msg_received = json.loads(msg_received, object_hook=lambda d: SimpleNamespace(**d))
                 msg_received = json.loads(msg_received)
                 msg_received = Message(**msg_received)
                 cb(msg_received)
 
-
-        def _start_receiving(self, cb):
-            self._initialize_communication()
-            thread = threading.Thread(target=self._t_run_receiver_loop, args=(cb,), kwargs={})
-            thread.start()
-            lg.debug("Reactor Running")
+        def _t_run_uncast_receiver_loop(self, cb):
+            while (not self.stopReceiving):
+                msg_received = self.uncast_sock.recv(10240)
+                msg_received = str(msg_received, encoding)
+                #msg_received = json.loads(msg_received, object_hook=lambda d: SimpleNamespace(**d))
+                msg_received = json.loads(msg_received)
+                msg_received = Message(**msg_received)
+                cb(msg_received)
 
         def shutdownReceiver(self):
             self.stopReceiving = True
@@ -217,11 +238,16 @@ class DefaultHeaders:
     TYPE = 'type'
 
 class MWSender:
-    def __init__(self, multicast_addr, port, additional_default_headers, uid):
+    def __init__(self, multicast_addr, mcast_port, uncast_port, additional_default_headers, uid):
         self.multicast_addr = multicast_addr
-        self.port = port
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+        self.mcast_port = mcast_port
+        self.uncast_port = uncast_port
+
+        self.mcast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.mcast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+
+        self.uncast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
         if additional_default_headers is None:
             self.additional_default_headers = {}
         else:
@@ -239,7 +265,7 @@ class MWSender:
         msg = Message(header=custom_headers | self._generate_default_header(self.multicast_addr), body=message_body)
         msg_str = json.dumps(msg.__dict__)
 
-        self.sock.sendto(msg_str.encode(), (self.multicast_addr, self.port))
+        self.mcast_sock.sendto(msg_str.encode(), (self.multicast_addr, self.mcast_port))
         lg.debug(f"Message send mc: {msg_str}")
 
     def send_message_unicast(self, destination_ip, message_body, custom_headers):
@@ -248,7 +274,7 @@ class MWSender:
 
         msg = Message(self._generate_default_header(destination_ip) | custom_headers, message_body)
         msg_str = json.dumps(msg.__dict__)
-        self.sock.sendto(msg_str.encode(), (self.multicast_addr, self.port))
+        self.uncast_sock.sendto(msg_str.encode(), (destination_ip, self.uncast_port))
         lg.debug(f"Message send uc: {msg_str}")
 
 
