@@ -33,7 +33,7 @@ def index_get():
                 last_alive_sec_ago = time.time() - peer.last_alive
                 offline = not peer.is_online()
                 buf += f"<span style=\"{'color: red' if offline else ''}\">IP: <a href=\"http://{peer.ip}:{port}\">{peer.ip}</a> | Last Alive " \
-                       f"{round(last_alive_sec_ago, ndigits=5)}s ago | Leader: {peer.is_leader} | UUID: {peer.uid} {'[OFFLINE]' if offline else ''}</span><br>"
+                       f"{round(last_alive_sec_ago, ndigits=5)}s ago | Leader: {node.middleware.is_uid_leader(peer.uid)} | UUID: {peer.uid} {'[OFFLINE]' if offline else ''}</span><br>"
             val = buf
         entries += f"<tr><td>{key}</td><td>{val}</td></tr>"
 
