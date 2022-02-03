@@ -2,16 +2,14 @@
 Contains the main Object that holds all functionality.
 """
 
-from middleware.communication import Middleware, Message, Peer, DefaultMessageTypes
-import time
+from communication import Middleware, Message, DefaultMessageTypes, global_events, MiddlewareEvents
 import threading
-import logging as lg
+from logger import lg
 
 from engine import World, FlightController, C3d
 import random
-from dash_wrapper import t_dash_interface, set_node_list
+from dash_wrapper import t_dash_interface
 
-lg.basicConfig(level=lg.INFO, format='%(relativeCreated)6d %(threadName)s %(message)s')
 
 
 class NodeState:
@@ -21,14 +19,14 @@ class NodeState:
 class DWNode:
     def __init__(self, world_kwargs=None):
         self.State = NodeState.INIT
-        self.middleware = Middleware(self.cb_multicast_message_received_handler, self.cb_heartbeat_payload)
-        self.readable_name = self.middleware.readable_name
         self.node_list = dict()
 
         # Engine
         x = random.uniform(-10, 10)
         y = random.uniform(-10, 10)
         z = random.uniform(-10, 10)
+
+        self.world = None
         if world_kwargs is None:
             self.world = World(max_drone_force=C3d(1.5, 1.5, 1.5), weight=0.2, start_position=C3d(x, y, z))
             self.flight_controller = FlightController(world_ref=self.world, start_destination=C3d(x, y, z))
@@ -38,13 +36,23 @@ class DWNode:
 
         self.dash_thread = threading.Thread(target=t_dash_interface)
         self.dash_thread.start()
-
         self.world.run_simulation()
         self.flight_controller.run_controller()
+
+        self.middleware = Middleware(self.cb_multicast_message_received_handler, self.cb_uncast_message_received, self.cb_heartbeat_payload)
+        self.readable_name = self.middleware.readable_name
+
+        global_events.register_event(MiddlewareEvents.SELF_ELECTED_AS_LEADER, self.test)
+
+    def test(self):
+        lg.info("Im an evenT!")
 
     def cb_heartbeat_payload(self):
         return {"pos": str(self.world.position),
          "vel": str(self.world.velocity), "acc": str(self.world.acceleration)}
+
+    def cb_uncast_message_received(self, msg:Message):
+        lg.warn(f"Got unhandeled unicast msg: {msg.header}")
 
     def cb_multicast_message_received_handler(self, msg_received: Message):
 

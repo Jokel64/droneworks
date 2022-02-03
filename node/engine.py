@@ -1,5 +1,5 @@
 import copy
-import logging
+from logger import lg
 import threading
 import time
 import numpy as np
@@ -90,7 +90,7 @@ class C3d:
 
 
 class World:
-    def __init__(self, weight: float, start_position: C3d, max_drone_force: C3d, fps=100, cw_a_rho=0.3, disable_logging=False):
+    def __init__(self, weight: float, start_position: C3d, max_drone_force: C3d, fps=100, cw_a_rho=0.3, disable_lg=False):
         self.weight = weight
         self.max_drone_force = max_drone_force
         self.position = start_position
@@ -101,8 +101,8 @@ class World:
         self.cw_A_rho = cw_a_rho
         self.thread = None
         self.force_lock = threading.Lock()
-        self.do_logging = True
-        self.global_logging_disabled = disable_logging
+        self.do_lg = True
+        self.global_lg_disabled = disable_lg
 
     def __str__(self):
         return f"Position: {self.position}<br>Velocity: {self.velocity}<br>Acceleration: {self.acceleration}"
@@ -123,8 +123,8 @@ class World:
 
             runtime = (time.time()-timestamp)
             if counter > 10:
-                if self.do_logging and not self.global_logging_disabled:
-                    logging.debug(f"Acceleration: X: {round(self.acceleration.x, ndigits=5)} | Y: {round(self.acceleration.y, ndigits=5)} "
+                if self.do_lg and not self.global_lg_disabled:
+                    lg.debug(f"Acceleration: X: {round(self.acceleration.x, ndigits=5)} | Y: {round(self.acceleration.y, ndigits=5)} "
                                  f"| Z: {round(self.acceleration.z, ndigits=5)} |||  Velocity X: {round(self.velocity.x, ndigits=3)} | Y: {round(self.velocity.y, ndigits=3)} | "
                                 f"Z: {round(self.velocity.z, ndigits=3)} ||| Position X: {round(self.position.x, ndigits=3)} | "
                                 f"Y: {round(self.position.y, ndigits=3)} | Z: {round(self.position.z, ndigits=3)} | Runtime[ms]: {runtime*1000}")
@@ -134,7 +134,7 @@ class World:
 
             sleeptime = 1/self.fps - runtime
             if sleeptime < 0:
-                logging.error("The physics simulation is overloaded. Please buy better hardware. Thanks.")
+                lg.error("The physics simulation is overloaded. Please buy better hardware. Thanks.")
             else:
                 time.sleep(1/self.fps - runtime)
 
@@ -171,8 +171,8 @@ class FlightController:
 
     def go_to_point(self, destination: C3d):
         self.destination = destination
-        logging.debug(f"Go to new destination: {destination}")
-        self.world.do_logging = True
+        lg.debug(f"Go to new destination: {destination}")
+        self.world.do_lg = True
         self.arrived_at_destination = False
 
     def __control_loop(self):
@@ -186,7 +186,7 @@ class FlightController:
             throttle.min_max_norm(1)
             self.world.accelerate(throttle)
             if copy.deepcopy(rel_pos).close_to_zero(0.00001):
-                self.world.do_logging = False
+                self.world.do_lg = False
                 self.arrived_at_destination = True
             time.sleep(self.update_interval)
 
@@ -210,6 +210,6 @@ if __name__ == '__main__':
             y = input("Y:")
             z = input("Z:")
             fc.go_to_point(C3d(float(x), float(y), float(z)))
-            logging.info(f"Command new destination at: x:{x} | y:{y} | z:{z}")
+            lg.info(f"Command new destination at: x:{x} | y:{y} | z:{z}")
         else:
             time.sleep(1)
