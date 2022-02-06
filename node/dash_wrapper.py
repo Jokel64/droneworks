@@ -43,7 +43,7 @@ data = dbc.Card(
         ),
     ],
     body=True,
-    color="secondary",
+    color="primary",
     outline=True,
 )
 
@@ -51,12 +51,17 @@ graph = dbc.Card(
     [
 
         html.H2("Drone Position Visualisation", className="card-title"),
-        dcc.Graph(id="scatter-plot"),
-        dcc.Interval(
-            id='interval-component',
-            interval=1 * 100)
+        html.Div(children=[
+            html.Div(children=[
+                dcc.Graph(id="scatter-plot"),
+            ])
+        ],
+        style={'display': 'inline-block', 'width': '100%'})
+
     ],
     body=True,
+    color="primary",
+    outline=True,
 )
 
 _app.layout = dbc.Container(
@@ -65,9 +70,14 @@ _app.layout = dbc.Container(
         html.Hr(),
         dbc.Row(
             [
-                dbc.Col(graph, md=8),
-                dbc.Col(control, md=2),
-                dbc.Col(data, md=2)
+                dbc.Col(graph),
+            ],
+            align="center",
+        ),
+        dbc.Row(
+            [
+                dbc.Col(dbc.CardGroup([control, data])),
+                #dbc.Col(data, md=4)
             ],
             align="center",
         ),
