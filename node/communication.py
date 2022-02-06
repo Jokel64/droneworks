@@ -109,9 +109,6 @@ class Middleware:
         self.ext_cb_mcast_message_received = cb_mcast_message_received
         self.ext_cb_uncast_message_received = cb_uncast_message_received
 
-        # Empty Initializations
-        self.ip = getCurrentIpAddress()
-
         # Network Interfaces
         self.mc_sender = MWSender(MCAST_GRP, MCAST_PORT, UNCAST_PORT, None, self.uid)
         self.mc_rec = MulticastReceiver(MCAST_GRP, MCAST_PORT, getCurrentIpAddress(), UNCAST_PORT,
@@ -146,6 +143,13 @@ class Middleware:
 
     def cb_leader_found(self):
         pass
+
+    def get_own_ip(self):
+        h_name = socket.gethostname()
+        return socket.gethostbyname(h_name)
+
+    def get_own_hostname(self):
+        return socket.gethostname()
 
     def cb_uncast_message_received(self, msg: Message):
         # Handle Leader answers internally
