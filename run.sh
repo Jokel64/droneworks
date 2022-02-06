@@ -12,6 +12,6 @@ fi
 for (( i=0; i<=$DRONEWORKS_NUM_NODES; i++ ))
 do
   NAME=drone-node-"$i"
-  docker run --rm -it -d --name $NAME $DRONEWORKS_DOCKER_IMAGE_NAME
+  docker run --rm -it -d --network bridge --name $NAME $DRONEWORKS_DOCKER_IMAGE_NAME
   echo "Started $NAME"
 done

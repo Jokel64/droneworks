@@ -2,6 +2,7 @@ import sys
 
 from logger import lg, get_log
 import time
+import uuid
 
 from node import DWNode
 from flask import Flask, request
@@ -43,17 +44,17 @@ def index_get():
                     elif offline:
                         textcolor = 'red'
                     buf += f"<span style=\"color:{textcolor}\">IP: <a href=\"http://{peer.ip}:{port}\">{peer.ip}</a> | Last Alive " \
-                           f"{'{:05.2f}'.format(last_alive_sec_ago)}s ago | Leader: {isleader} | UUID: {peer.uid} {'[OFFLINE]' if offline else ''}</span><br>"
+                           f"{'{:05.2f}'.format(last_alive_sec_ago)}s ago | Leader: {isleader} | UUID: {peer.uid} [{uuid.UUID(peer.uid).time}] {'[OFFLINE]' if offline else ''}</span><br>"
                 val = buf
             entries += f"<tr><td>{key}</td><td>{val}</td></tr>"
         except:
             entries += "<tr><td>Error</td><td>Error</td></tr>"
-
-    return f"""<!DOCTYPE html><html><head><meta http-equiv="refresh" content="5"><style>offline ? ''
+        #<meta http-equiv="refresh" content="5">
+    return f"""<!DOCTYPE html><html><head><style>offline ? ''
 table, form {{font-family: arial, sans-serif;border-collapse: collapse;width: 100%;}}
 td, th {{border: 1px solid #dddddd;text-align: left;padding: 8px;}}
 tr:nth-child(even) {{background-color: #dddddd;}}
-</style></head><body style="font-family: monospace;"><h2>{node.readable_name} [{node.middleware.ip}]</h2><table><tr><th>Key</th><th>Value</th>
+</style></head><body style="font-family: monospace;"><h2>{node.readable_name} [{node.middleware.get_own_ip()}]</h2><table><tr><th>Key</th><th>Value</th>
   </tr>{entries}</table><form method="POST"><br><b>Go to destination manually</b><br>X:<input type="number" name="x" value=0> 
   Y:<input type="number" name="y" value=0> Z:<input type="number" name="z" value=0> 
   <input type="submit" name="new_dest" value="Go"></form>

@@ -2,7 +2,7 @@
 Contains the main Object that holds all functionality.
 """
 
-from communication import Middleware, Message, DefaultMessageTypes, global_events, MiddlewareEvents
+from communication import Middleware, Message, DefaultMessageTypes, global_events, MiddlewareEvents, getCurrentIpAddress
 import threading
 from logger import lg
 
@@ -11,14 +11,8 @@ import random
 from dash_wrapper import t_dash_interface
 
 
-
-class NodeState:
-    INIT = 'init'
-
-
 class DWNode:
     def __init__(self, world_kwargs=None):
-        self.State = NodeState.INIT
         self.node_list = dict()
 
         # Engine
@@ -34,8 +28,7 @@ class DWNode:
             self.world = World(**world_kwargs)
             self.flight_controller = FlightController(world_ref=self.world, start_destination=C3d(0, 0, 0))
 
-        self.dash_thread = threading.Thread(target=t_dash_interface)
-        self.dash_thread.start()
+        self.dash_thread = None
         self.world.run_simulation()
         self.flight_controller.run_controller()
 
@@ -45,7 +38,10 @@ class DWNode:
         global_events.register_event(MiddlewareEvents.SELF_ELECTED_AS_LEADER, self.test)
 
     def test(self):
-        lg.info("Im an evenT!")
+        lg.info("Starting Dash interface as leader.")
+
+        self.dash_thread = threading.Thread(target=t_dash_interface, args=(getCurrentIpAddress(),))
+        self.dash_thread.start()
 
     def cb_heartbeat_payload(self):
         return {"pos": str(self.world.position),

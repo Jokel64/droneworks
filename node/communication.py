@@ -88,8 +88,6 @@ global_events = MiddlewareEvents()
 Main class
 """
 class Middleware:
-
-
     def __init__(self, cb_mcast_message_received, cb_uncast_message_received, cb_heartbeat_payload=None, heartbeat_rate_s=1, leader_control_rate_s=0.01):
         # Error checks
         if heartbeat_rate_s >= node_offline_timeout_s:
@@ -100,7 +98,7 @@ class Middleware:
         self.leader_control_rate_s = leader_control_rate_s
 
         # Other Properties
-        self.uid = str(uuid.uuid4())
+        self.uid = str(uuid.uuid1())
         self.readable_name = names.get_full_name()
         self.peer_list = dict()
 
@@ -119,7 +117,7 @@ class Middleware:
         self.leader_thread = threading.Thread(target=self._t_leader_supervisor)
 
         # Helper Classes
-        self.leader_subsystem = LeaderSubsystem(sender=self.mc_sender, uid=self.uid, cb_leader_found=self.cb_leader_found)
+        self.leader_subsystem = LeaderSubsystem(sender=self.mc_sender, peer_list=self.peer_list, uid=self.uid, cb_leader_found=self.cb_leader_found)
 
         # Start Threads
         self.heartbeat_thread.start()
@@ -153,9 +151,13 @@ class Middleware:
 
     def cb_uncast_message_received(self, msg: Message):
         # Handle Leader answers internally
-        if msg.get_header(DefaultHeaders.TYPE) is not None and msg.get_header(DefaultHeaders.TYPE) == DefaultMessageTypes.LEADER_ANSWER_MESSAGE:
-            self.leader_subsystem.leader_answer_message_received_handler(msg)
-            return
+        if msg.get_header(DefaultHeaders.TYPE) is not None:
+            if msg.get_header(DefaultHeaders.TYPE) == DefaultMessageTypes.LEADER_ANSWER_MESSAGE:
+                self.leader_subsystem.leader_answer_message_received_handler(msg)
+                return
+            elif msg.get_header(DefaultHeaders.TYPE) == DefaultMessageTypes.LEADER_ELECTION_MESSAGE:
+                self.leader_subsystem.leader_election_message_received_handler(msg)
+                return
 
         # If nothing above is applicable route to external controller
         try:
@@ -175,7 +177,7 @@ class Middleware:
 
         # Distribute Messages if middleware related
         if msg.header[DefaultHeaders.TYPE] == DefaultMessageTypes.LEADER_ELECTION_MESSAGE:
-            self.leader_subsystem.leader_election_message_received_handler(msg)
+            lg.error("Broadcast used for election message instead of unicast!")
             return
         elif msg.header[DefaultHeaders.TYPE] == DefaultMessageTypes.LEADER_COORDINATOR_MESSAGE:
             self.leader_subsystem.leader_coordinator_message_received_handler(msg)
@@ -213,12 +215,25 @@ class Middleware:
     """
 
     def _t_leader_supervisor(self):
+        time.sleep(2)
         while True:
-            if not self.leader_subsystem.leader_uid or self.get_leader() is None or not self.get_leader().is_online() \
-                    or self.leader_subsystem.leader_election_neccessary:
-                lg.info("No leader found by supervisor. Init leader election process.")
+            start_election = False
+
+            if not self.leader_subsystem.leader_uid:
+                start_election = True
+                lg.info(f"Leader UID [{self.leader_subsystem.leader_uid}] not set in subsystem.")
+            elif self.get_leader() is None:
+                start_election = True
+                lg.info("Self.get_leader() returned none.")
+            elif not self.get_leader().is_online():
+                start_election = True
+                lg.info("Leader is no longer online.")
+            elif self.leader_subsystem.leader_election_necessary:
+                lg.info("Leader subsystem deemed election necessary.")
+                start_election = True
+            if start_election:
+                lg.info("Init leader election process.")
                 self.leader_subsystem.leader_election_alg()
-            # todo control rate...
             time.sleep(self.leader_control_rate_s)
 
 
@@ -306,8 +321,10 @@ class MWSender:
 
         msg = Message(header=custom_headers | self._generate_default_header(self.multicast_addr), body=message_body)
         msg_str = json.dumps(msg.__dict__)
-
-        self.mcast_sock.sendto(msg_str.encode(), (self.multicast_addr, self.mcast_port))
+        try:
+            self.mcast_sock.sendto(msg_str.encode(), (self.multicast_addr, self.mcast_port))
+        except OSError as e:
+            lg.error(f"Error sending multicast Message: {e}")
         lg.debug(f"Message send mc: {msg_str}")
 
     def send_message_unicast(self, destination_ip, message_body, custom_headers):
@@ -316,7 +333,10 @@ class MWSender:
 
         msg = Message(self._generate_default_header(destination_ip) | custom_headers, message_body)
         msg_str = json.dumps(msg.__dict__)
-        self.uncast_sock.sendto(msg_str.encode(), (destination_ip, self.uncast_port))
+        try:
+            self.uncast_sock.sendto(msg_str.encode(), (destination_ip, self.uncast_port))
+        except OSError as e:
+            lg.error(f"Error sending unicast Message: {e}")
         lg.debug(f"Message send uc: {msg_str}")
 
 
@@ -335,99 +355,75 @@ Abbreviations of default bully alg:
     - broadcast instead of unicast to higher uids for robustness
 """
 class LeaderSubsystem:
-    def __init__(self, sender: MWSender, uid: str, cb_leader_found, voting_timeout=2):
+    def __init__(self, sender: MWSender, peer_list, uid: str, cb_leader_found, voting_timeout=2):
         self.VOTING_TIMEOUT = voting_timeout
         self.mw_sender = sender
+        self.peer_list = peer_list
         self.own_uid = uid
-        self.is_leader = False
-        self.received_leader_answer_message = False
         self.leader_uid = ''
         self.cb_leader_found = cb_leader_found
-        self.leader_election_neccessary = False
-        self.lost_an_election = False
+        self.received_leader_answer_message = False
+        self.leader_election_necessary = False
 
     def participating_in_election(self):
-        return self.thread.isAlive()
+        pass
 
     def _broadcast_election_message(self):
-        lg.info("Broadcasting election message.")
-        self.mw_sender.send_message_multicast(None, {DefaultHeaders.TYPE: DefaultMessageTypes.LEADER_ELECTION_MESSAGE})
-
-    def _reset_leader_state(self):
-        self.is_leader = False
-        self.leader_uid = ""
-        self.received_leader_answer_message = False
-        self.lost_an_election = False
-        self.leader_election_neccessary = False
-
+        for uid in self.peer_list:
+            if not self._other_looses_election(uid) and not uid==self.own_uid:
+                self.mw_sender.send_message_unicast(self.peer_list[uid].ip, None, {DefaultHeaders.TYPE: DefaultMessageTypes.LEADER_ELECTION_MESSAGE})
+                lg.info(f"Sent election message to {self.peer_list[uid].ip} [{self.peer_list[uid].uid}]")
+        lg.info("Election message broadcasting completed.")
 
     def _other_looses_election(self, other_id):
-        other_uid = uuid.UUID(other_id)
-        this_uid = uuid.UUID(self.own_uid)
+        other_time = uuid.UUID(other_id).time
+        this_time = uuid.UUID(self.own_uid).time
 
-        return this_uid < other_uid
+        if other_time == this_time:
+            return self.own_uid < other_id
+        else:
+            return this_time < other_time
 
     def leader_election_message_received_handler(self, msg: Message):
-        if msg.get_header(DefaultHeaders.ORIGIN_IP) == getCurrentIpAddress():
-            return
-        lg.info(f"Received election message by {msg.get_header(DefaultHeaders.ORIGIN_IP)}")
-
-        other_uid = msg.get_header(DefaultHeaders.UID)
-        other_ip = msg.get_header(DefaultHeaders.ORIGIN_IP)
-
-        if self._other_looses_election(other_uid):
-            lg.info(f"Won election against {msg.get_header(DefaultHeaders.ORIGIN_IP)}")
-            self.mw_sender.send_message_unicast(other_ip, None,
-                                                {DefaultHeaders.TYPE: DefaultMessageTypes.LEADER_ANSWER_MESSAGE})
+        if self._other_looses_election(msg.get_header(DefaultHeaders.UID)):
+            self.mw_sender.send_message_unicast(msg.get_header(DefaultHeaders.ORIGIN_IP), None, {DefaultHeaders.TYPE: DefaultMessageTypes.LEADER_ANSWER_MESSAGE})
+            lg.info(f"Won election and send leader answer to {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{msg.get_header(DefaultHeaders.UID)}]. New election process necessary.")
+            self.leader_election_necessary = True
         else:
-            self.lost_an_election = True
-            lg.info(f"Lost election against {msg.get_header(DefaultHeaders.ORIGIN_IP)}")
-
+            lg.info(f"Lost election to {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{msg.get_header(DefaultHeaders.UID)}]")
 
     def leader_answer_message_received_handler(self, msg: Message):
-        lg.info(f"Received leader answer message by {msg.get_header(DefaultHeaders.ORIGIN_IP)}")
         self.received_leader_answer_message = True
+        lg.info(f"Answer by {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{msg.get_header(DefaultHeaders.UID)}]")
+
         pass
 
     def leader_coordinator_message_received_handler(self, msg: Message):
         other_uid = msg.get_header(DefaultHeaders.UID)
-
-        if other_uid == self.own_uid:
-            self.is_leader = True
-            self.leader_uid = self.own_uid
-            lg.info(f"Accepted self as new Coordinator.")
-            global_events.emit_event(MiddlewareEvents.SELF_ELECTED_AS_LEADER)
-
-        elif not self._other_looses_election(other_uid):
+        if not self._other_looses_election(other_uid):
             self.leader_uid = other_uid
-            self.is_leader = False
-            try:
-                self.cb_leader_found()
-            except Exception as e:
-                lg.error(f"Leader found callback threw an error: {e}")
-            lg.info(f"Accepted new Coordinator [{msg.get_header(DefaultHeaders.ORIGIN_IP)}]")
+            if other_uid == self.own_uid:
+                lg.info(f"Accepted self as leader.")
+            else:
+                lg.info(f"Accepted leader {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{other_uid}].")
         else:
-            lg.error(f"Coordinator [{msg.get_header(DefaultHeaders.ORIGIN_IP)}] illegitimately announced!")
-            self.leader_election_neccessary = True
+            lg.warn(f"Leader {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{other_uid}] illegitimately announced!")
+            self.leader_election_necessary = True
 
     """
     This thread is started if no leader is known.
     """
     def leader_election_alg(self):
-        lg.info("Leader election started.")
-        self._reset_leader_state()
+        self.leader_election_necessary = False
+        self.received_leader_answer_message = False
         self._broadcast_election_message()
         time.sleep(self.VOTING_TIMEOUT)
-
-        if self.received_leader_answer_message or self.lost_an_election:
-            lg.info("Leader election completed as slave.")
+        if self.received_leader_answer_message:
+            lg.info("Election completed as slave.")
         else:
+            lg.info("Election completed as leader.")
             self.mw_sender.send_message_multicast(None, {DefaultHeaders.TYPE: DefaultMessageTypes.LEADER_COORDINATOR_MESSAGE})
-            lg.info("Leader election completed as leader.")
 
-
-        time.sleep(0.5)
-        self.leader_election_neccessary = False
 
 
 """
