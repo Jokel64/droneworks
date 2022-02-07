@@ -9,7 +9,6 @@ from Messaging import Message, DefaultHeaders, DefaultMessageTypes
 from Utils import getCurrentIpAddress
 from Logger import lg
 
-from multipledispatch import dispatch
 
 
 class IPSender:
@@ -36,9 +35,9 @@ class IPSender:
                                                   DefaultHeaders.UID: self.uid}
 
     def send_message_multicast(self, message: Message):
-        if self.leave_out_intervall <= self.leave_out_counter:
-            self.leave_out_counter = 0
-            return
+        #if self.leave_out_intervall <= self.leave_out_counter:
+        #    self.leave_out_counter = 0
+        #    return
 
         self.leave_out_counter += 1
 

@@ -7,10 +7,10 @@ This function returns the IP Address of the current System
 """
 def getCurrentIpAddress():
     h_name = socket.gethostname()
-    IP_addres = socket.gethostbyname(h_name)
+    return socket.gethostbyname(h_name)
 
     #todo fix the problem when multiple networks exist
-    return "127.0.0.1"
+    #return "127.0.0.1"
 
 def getNextFreePort():
     # Init Uncast socket

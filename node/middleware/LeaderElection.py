@@ -64,7 +64,7 @@ class LeaderSubsystem:
 
     def leader_answer_message_received_handler(self, msg: Message):
         self.received_leader_answer_message = True
-        lg.info(f"Answer by {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{msg.get_header(DefaultHeaders.UID)}]")
+        lg.info(f"Election Answer by {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{msg.get_header(DefaultHeaders.UID)}]")
 
         pass
 
@@ -72,10 +72,11 @@ class LeaderSubsystem:
         other_uid = msg.get_header(DefaultHeaders.UID)
         if not self._other_looses_election(other_uid):
             self.leader_uid = other_uid
+            self.leader_election_necessary = False
             if other_uid == self.own_uid:
-                lg.info(f"Accepted self as leader.")
+                lg.info(f"Accepted self as leader. Leader election not necessary anymore.")
             else:
-                lg.info(f"Accepted leader {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{other_uid}].")
+                lg.info(f"Accepted leader {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{other_uid}]. Leader election not necessary anymore.")
         else:
             lg.warn(f"Leader {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{other_uid}] illegitimately announced!")
             self.leader_election_necessary = True
@@ -90,6 +91,7 @@ class LeaderSubsystem:
         time.sleep(self.VOTING_TIMEOUT)
         if self.received_leader_answer_message:
             lg.info("Election completed as slave.")
+            time.sleep(self.VOTING_TIMEOUT)
         else:
             lg.info("Election completed as leader.")
             self.r_mcast.send(Message({DefaultHeaders.TYPE: DefaultMessageTypes.LEADER_COORDINATOR_MESSAGE},None))

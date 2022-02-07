@@ -4,10 +4,9 @@ RUN pip install -r requirements.txt
 
 ADD main.py /
 ADD node.py /
-ADD communication.py /communication.py
+ADD middleware/ /middleware/
 ADD engine.py /
 ADD dash_wrapper.py /
-ADD logger.py /
 
 
 
