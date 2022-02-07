@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 plt.style.use('seaborn-whitegrid')
+shapedir = 'shapes'
 
 
 class ShapeStep:
@@ -53,9 +54,12 @@ class ShapeStep:
         return coords
 
 
+def get_available_shapes():
+    return os.listdir(shapedir)
+
+
 if __name__ == '__main__':
     while True:
-        shapedir = 'shapes'
         print("Select one of the folowing shapes:")
         paths = os.listdir(shapedir)
         for path, i in zip(paths, range(len(paths))):
@@ -65,6 +69,7 @@ if __name__ == '__main__':
         poss = st.get_positions(100)
         my_list = []
         for pos in poss:
+            print(pos)
             my_list.append(pos.to_numpy_array())
 
         arr = np.array(my_list)

@@ -11,18 +11,18 @@ from IPCommunication import IPSender, IPReceiver
 from ReliableMulticast import RMulticast
 from LeaderElection import LeaderSubsystem
 from Peer import Peer
-
-
+import MiddelwareEvents
 """
 Main class
 """
 class Middleware:
-    def __init__(self, cb_mcast_message_received, cb_uncast_message_received, cb_heartbeat_payload=None, heartbeat_rate_s=1, leader_control_rate_s=0.01):
+    def __init__(self, event_engine:MiddelwareEvents, cb_mcast_message_received, cb_uncast_message_received, cb_heartbeat_payload=None, heartbeat_rate_s=1, leader_control_rate_s=0.01):
         # Error checks
         if heartbeat_rate_s >= node_offline_timeout_s:
             ValueError("Heartbeat rate must be faster than the node offline_timeout")
 
         self.unicast_port = getNextFreePort()
+        self.event_engine = event_engine
 
         # Settings
         self.heartbeat_rate_s = heartbeat_rate_s
@@ -59,7 +59,7 @@ class Middleware:
         self.leader_thread = threading.Thread(target=self._t_leader_supervisor)
 
         # Helper Classes
-        self.leader_subsystem = LeaderSubsystem(sender=self.mc_sender, r_mcast=self.r_multicast, peer_list=self.peer_list, uid=self.uid,
+        self.leader_subsystem = LeaderSubsystem(event_engine, sender=self.mc_sender, r_mcast=self.r_multicast, peer_list=self.peer_list, uid=self.uid,
                                                 cb_leader_found=self.cb_leader_found)
 
         # Start Threads

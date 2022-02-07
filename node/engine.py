@@ -6,10 +6,22 @@ import numpy as np
 
 
 class C3d:
-    def __init__(self, x: float, y: float, z: float):
-        self.x = x
-        self.y = y
-        self.z = z
+    def __init__(self, *args):
+        if len(args) != 0:
+            if isinstance(args[0], dict):
+                kwargs = args[0]
+                self.x = kwargs['x']
+                self.y = kwargs['y']
+                self.z = kwargs['z']
+            else:
+
+                self.x = args[0]
+                self.y = args[1]
+                self.z = args[2]
+        else:
+            self.x = 0
+            self.y = 0
+            self.z = 0
 
     def __floordiv__(self, other):
         self.x = self.x / other

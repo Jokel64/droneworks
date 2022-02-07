@@ -14,12 +14,15 @@ from node import DWNode
 from flask import Flask, request
 
 from engine import C3d
+import middleware.Configuration as Config
+
 
 node = DWNode()
 
 app = Flask(__name__)
 
 port=3300
+
 
 def getNextFreePort():
     # Init Uncast socket

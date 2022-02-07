@@ -5,9 +5,11 @@ from Logger import lg
 from Messaging import Message, DefaultHeaders, DefaultMessageTypes
 from IPCommunication import IPReceiver
 from Utils import getCurrentIpAddress
-from MiddelwareEvents import MiddlewareEvents, global_events
+from MiddelwareEvents import MiddlewareEvents
 from IPCommunication import IPSender
 from ReliableMulticast import RMulticast
+import Configuration as Config
+import MiddelwareEvents
 
 """
 This Class provides basic leader election by using the bully algorithm
@@ -24,7 +26,7 @@ Abbreviations of default bully alg:
     - broadcast instead of unicast to higher uids for robustness
 """
 class LeaderSubsystem:
-    def __init__(self, sender: IPSender, r_mcast: RMulticast, peer_list, uid: str, cb_leader_found, voting_timeout=2):
+    def __init__(self, event_engine: MiddelwareEvents, sender: IPSender, r_mcast: RMulticast, peer_list, uid: str, cb_leader_found, voting_timeout=2):
         self.VOTING_TIMEOUT = voting_timeout
         self.mw_sender = sender
         self.r_mcast = r_mcast
@@ -34,6 +36,7 @@ class LeaderSubsystem:
         self.cb_leader_found = cb_leader_found
         self.received_leader_answer_message = False
         self.leader_election_necessary = False
+        self.event_engine = event_engine
 
     def participating_in_election(self):
         pass
@@ -71,12 +74,15 @@ class LeaderSubsystem:
     def leader_coordinator_message_received_handler(self, msg: Message):
         other_uid = msg.get_header(DefaultHeaders.UID)
         if not self._other_looses_election(other_uid):
+            if other_uid == self.own_uid:
+                lg.info(f"Accepting self as leader. Leader election not necessary anymore.")
+            else:
+                lg.info(f"Accepting leader {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{other_uid}]. Leader election not necessary anymore.")
+                if self.leader_uid == self.own_uid:
+                    self.event_engine.emit_event(MiddlewareEvents.LOST_LEADER_STATUS)
+
             self.leader_uid = other_uid
             self.leader_election_necessary = False
-            if other_uid == self.own_uid:
-                lg.info(f"Accepted self as leader. Leader election not necessary anymore.")
-            else:
-                lg.info(f"Accepted leader {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{other_uid}]. Leader election not necessary anymore.")
         else:
             lg.warn(f"Leader {msg.get_header(DefaultHeaders.ORIGIN_IP)} [{other_uid}] illegitimately announced!")
             self.leader_election_necessary = True
@@ -94,4 +100,5 @@ class LeaderSubsystem:
             time.sleep(self.VOTING_TIMEOUT)
         else:
             lg.info("Election completed as leader.")
-            self.r_mcast.send(Message({DefaultHeaders.TYPE: DefaultMessageTypes.LEADER_COORDINATOR_MESSAGE},None))
+            self.r_mcast.send(Message({DefaultHeaders.TYPE: DefaultMessageTypes.LEADER_COORDINATOR_MESSAGE}, None))
+            self.event_engine.emit_event(MiddlewareEvents.SELF_ELECTED_AS_LEADER)

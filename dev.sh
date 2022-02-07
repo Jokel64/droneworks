@@ -12,4 +12,3 @@ fi
 NAME=drone-node-dev
 docker run -it -d --name $NAME $DRONEWORKS_DOCKER_IMAGE_NAME
 echo "Started $NAME"
-

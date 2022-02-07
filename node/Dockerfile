@@ -6,7 +6,10 @@ ADD main.py /
 ADD node.py /
 ADD middleware/ /middleware/
 ADD engine.py /
+ADD shape_logic.py /
 ADD dash_wrapper.py /
+ADD shapes/ /shapes/
+
 
 
 

@@ -35,7 +35,7 @@ class RMulticast:
         # Increment Sq by one
         self.sequence_number += 1
 
-        lg.info(f"sending new message with seq: {self.sequence_number}")
+        #lg.info(f"sending new message with seq: {self.sequence_number}")
 
         # Attach seq and acknowledgements to message
         message.seq = self.sequence_number
@@ -46,12 +46,12 @@ class RMulticast:
         self.ip_sender.send_message_multicast(message)  # Send Message
 
     def receive(self, msg: Message):
-        lg.info(f'recived multicast msg with sqe: {msg.seq}')
+        #lg.info(f'recived multicast msg with sqe: {msg.seq}')
         process_id_sender = msg.header[DefaultHeaders.UID]
         R_q = self.get_sequence_number_for_process(process_id_sender, msg.seq)
 
         if msg.seq == R_q + 1: # msg is in order
-            lg.info(f'msg in order delivering to application: {msg.seq}')
+            #lg.info(f'msg in order delivering to application: {msg.seq}')
             self.latest_deliveries[process_id_sender] += 1
             self.deliver_items_from_hb(process_id_sender, R_q+2)
             self.deliverToApplication(msg)
