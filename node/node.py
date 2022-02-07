@@ -2,17 +2,24 @@
 Contains the main Object that holds all functionality.
 """
 
-from communication import Middleware, Message, DefaultMessageTypes, global_events, MiddlewareEvents, getCurrentIpAddress
+from middleware.Middleware import Middleware, Message, DefaultMessageTypes
+from middleware.MiddelwareEvents import global_events, MiddlewareEvents
 import threading
-from logger import lg
+from middleware.Logger import lg
 
 from engine import World, FlightController, C3d
 import random
 from dash_wrapper import t_dash_interface
 
 
+
+class NodeState:
+    INIT = 'init'
+
+
 class DWNode:
     def __init__(self, world_kwargs=None):
+        self.State = NodeState.INIT
         self.node_list = dict()
 
         # Engine

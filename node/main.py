@@ -2,7 +2,6 @@ import sys
 
 from logger import lg, get_log
 import time
-import uuid
 
 from node import DWNode
 from flask import Flask, request
@@ -15,9 +14,25 @@ app = Flask(__name__)
 
 port=3300
 
+def getNextFreePort():
+    # Init Uncast socket
+
+    portSearch = port
+
+    while portSearch <= port+100:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.bind(('0.0.0.0', portSearch))
+            sock.close()
+            return portSearch
+        except:
+            portSearch += 1
+    return None
+
+
 @app.route("/", methods=["POST"])
 def index_post():
-    if request.form["kill"]:
+    if "kill" in request.form:
         lg.error("Not yet implemented.")
     else:
         x = float(request.form["x"])
@@ -43,7 +58,10 @@ def index_get():
                         textcolor = 'green'
                     elif offline:
                         textcolor = 'red'
-                    buf += f"<span style=\"color:{textcolor}\">IP: <a href=\"http://{peer.ip}:{port}\">{peer.ip}</a> | Last Alive " \
+                    #dirty way for new port calcualtion
+                    info_port = port +  (peer.port - 5008)
+
+                    buf += f"<span style=\"color:{textcolor}\">IP: <a href=\"http://{peer.ip}:{info_port}\")>{peer.ip}</a> Port:({peer.port})| Last Alive " \
                            f"{'{:05.2f}'.format(last_alive_sec_ago)}s ago | Leader: {isleader} | UUID: {peer.uid} [{uuid.UUID(peer.uid).time}] {'[OFFLINE]' if offline else ''}</span><br>"
                 val = buf
             entries += f"<tr><td>{key}</td><td>{val}</td></tr>"
@@ -63,4 +81,4 @@ tr:nth-child(even) {{background-color: #dddddd;}}
   <div style="margin-top: 15px"><h2>Log</h2><span>{get_log()}</span></div></body></html>"""
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=getNextFreePort())

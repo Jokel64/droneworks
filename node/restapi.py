@@ -1,6 +1,3 @@
-from logger import lg
-from flask import Flask, jsonify
-from flask_cors import CORS
 from flask_classful import FlaskView, route
 from flask import request
 from engine import World, FlightController, C3d

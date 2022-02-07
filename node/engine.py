@@ -1,5 +1,5 @@
 import copy
-from logger import lg
+from middleware.Logger import lg
 import threading
 import time
 import numpy as np
