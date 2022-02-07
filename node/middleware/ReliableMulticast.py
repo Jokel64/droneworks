@@ -64,10 +64,10 @@ class RMulticast:
         if msg.seq <= R_q: # we have received a duplicate
             lg.info(f"message{msg.seq} is duplicate dropping")
 
-        for uid, ack_seq in msg.acks.items():
-            if ack_seq > self.get_sequence_number_for_process(uid):
-                lg.info(f"we did not receive at least one message from {process_id_sender}")
-                #self.send_negative_ack_for_seq(msg, self.get_sequence_number_for_process(uid)+1)
+        #for uid, ack_seq in msg.acks.items():
+        #    if ack_seq > self.get_sequence_number_for_process(uid):
+        #        lg.info(f"we did not receive at least one message from {process_id_sender}")
+        #        #self.send_negative_ack_for_seq(msg, self.get_sequence_number_for_process(uid)+1)
     '''
     This Method delivers a correct in order message to the application
     '''
@@ -81,8 +81,12 @@ class RMulticast:
         if uid in self.latest_deliveries:
             seq_out = self.latest_deliveries[uid]
         else: # This happens if no seq is found e.g when node joined the group -> set seq to seq received -1
-            self.latest_deliveries[uid] = seq - 1
-            seq_out = seq - 1
+            if seq - 1 == 0: # Edge Case: Two drones join simultaniosly -> cannot get msg with id 0
+                self.latest_deliveries[uid] = 1
+                seq_out = 1
+            else:
+                self.latest_deliveries[uid] = seq - 1
+                seq_out = seq - 1
         return seq_out
 
     '''
