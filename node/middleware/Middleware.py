@@ -29,7 +29,7 @@ class Middleware:
         self.leader_control_rate_s = leader_control_rate_s
 
         # Other Properties
-        self.uid = str(uuid.uuid4())
+        self.uid = str(uuid.uuid1())
         self.readable_name = names.get_full_name()
         self.peer_list = dict()
 
@@ -59,8 +59,8 @@ class Middleware:
         self.leader_thread = threading.Thread(target=self._t_leader_supervisor)
 
         # Helper Classes
-        self.leader_subsystem = LeaderSubsystem(sender=self.mc_sender, uid=self.uid,
-                                                cb_leader_found=self.cb_leader_found, rmcast=self.r_multicast)
+        self.leader_subsystem = LeaderSubsystem(sender=self.mc_sender, r_mcast=self.r_multicast, peer_list=self.peer_list, uid=self.uid,
+                                                cb_leader_found=self.cb_leader_found)
 
         # Start Threads
         self.heartbeat_thread.start()
@@ -87,9 +87,13 @@ class Middleware:
 
     def cb_uncast_message_received(self, msg: Message):
         # Handle Leader answers internally
-        if msg.get_header(DefaultHeaders.TYPE) is not None and msg.get_header(DefaultHeaders.TYPE) == DefaultMessageTypes.LEADER_ANSWER_MESSAGE:
-            self.leader_subsystem.leader_answer_message_received_handler(msg)
-            return
+        if msg.get_header(DefaultHeaders.TYPE) is not None:
+            if msg.get_header(DefaultHeaders.TYPE) == DefaultMessageTypes.LEADER_ANSWER_MESSAGE:
+                self.leader_subsystem.leader_answer_message_received_handler(msg)
+                return
+            elif msg.get_header(DefaultHeaders.TYPE) == DefaultMessageTypes.LEADER_ELECTION_MESSAGE:
+                self.leader_subsystem.leader_election_message_received_handler(msg)
+                return
 
         if msg.get_header(DefaultHeaders.TYPE) is not None and msg.get_header(DefaultHeaders.TYPE) == DefaultMessageTypes.NEGATIVE_ACK:
             self.r_multicast.recived_neg_ack_message(msg)
@@ -114,6 +118,7 @@ class Middleware:
         # Distribute Messages if middleware related
         if msg.header[DefaultHeaders.TYPE] == DefaultMessageTypes.LEADER_ELECTION_MESSAGE:
             self.leader_subsystem.leader_election_message_received_handler(msg)
+            lg.error("Broadcast used for election message instead of unicast!")
             return
         elif msg.header[DefaultHeaders.TYPE] == DefaultMessageTypes.LEADER_COORDINATOR_MESSAGE:
             self.leader_subsystem.leader_coordinator_message_received_handler(msg)
@@ -153,11 +158,23 @@ class Middleware:
     """
 
     def _t_leader_supervisor(self):
+        time.sleep(2)
         while True:
-            if not self.leader_subsystem.leader_uid or self.get_leader() is None or not self.get_leader().is_online() \
-                    or self.leader_subsystem.leader_election_neccessary:
-                lg.info("No leader found by supervisor. Init leader election process.")
-                self.leader_subsystem.leader_election_alg()
-            # todo control rate...
-            time.sleep(self.leader_control_rate_s)
+            start_election = False
 
+            if not self.leader_subsystem.leader_uid:
+                start_election = True
+                lg.info(f"Leader UID [{self.leader_subsystem.leader_uid}] not set in subsystem.")
+            elif self.get_leader() is None:
+                start_election = True
+                lg.info("Self.get_leader() returned none.")
+            elif not self.get_leader().is_online():
+                start_election = True
+                lg.info("Leader is no longer online.")
+            elif self.leader_subsystem.leader_election_necessary:
+                lg.info("Leader subsystem deemed election necessary.")
+                start_election = True
+            if start_election:
+                lg.info("Init leader election process.")
+                self.leader_subsystem.leader_election_alg()
+            time.sleep(self.leader_control_rate_s)

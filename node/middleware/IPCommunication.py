@@ -47,8 +47,10 @@ class IPSender:
 
         message.header = message.header | self._generate_default_header(self.multicast_addr)
         msg_str = json.dumps(message.__dict__)
-
-        self.mcast_sock.sendto(msg_str.encode(), (self.multicast_addr, self.mcast_port))
+        try:
+            self.mcast_sock.sendto(msg_str.encode(), (self.multicast_addr, self.mcast_port))
+        except OSError as e:
+            lg.error(f"Error sending multicast Message: {e}")
         lg.debug(f"Message send mc: {msg_str}")
 
 
@@ -58,7 +60,10 @@ class IPSender:
 
         msg = Message(self._generate_default_header(destination_ip) | custom_headers, message_body)
         msg_str = json.dumps(msg.__dict__)
-        self.uncast_sock.sendto(msg_str.encode(), (destination_ip, destination_port))
+        try:
+            self.uncast_sock.sendto(msg_str.encode(), (destination_ip, destination_port))
+        except OSError as e:
+            lg.error(f"Error sending unicast Message: {e}")
         lg.debug(f"Message send uc: {msg_str}")
 
 

@@ -1,6 +1,13 @@
-import sys
+import os, sys
+import socket
+import uuid
 
-from logger import lg, get_log
+projectDirectory = os.getcwd()
+sys.path.append(projectDirectory+'/middleware')
+
+
+from middleware.Logger import lg, get_log
+from middleware.Utils import getCurrentIpAddress
 import time
 
 from node import DWNode
@@ -72,7 +79,7 @@ def index_get():
 table, form {{font-family: arial, sans-serif;border-collapse: collapse;width: 100%;}}
 td, th {{border: 1px solid #dddddd;text-align: left;padding: 8px;}}
 tr:nth-child(even) {{background-color: #dddddd;}}
-</style></head><body style="font-family: monospace;"><h2>{node.readable_name} [{node.middleware.get_own_ip()}]</h2><table><tr><th>Key</th><th>Value</th>
+</style></head><body style="font-family: monospace;"><h2>{node.readable_name} [{getCurrentIpAddress()}]</h2><table><tr><th>Key</th><th>Value</th>
   </tr>{entries}</table><form method="POST"><br><b>Go to destination manually</b><br>X:<input type="number" name="x" value=0> 
   Y:<input type="number" name="y" value=0> Z:<input type="number" name="z" value=0> 
   <input type="submit" name="new_dest" value="Go"></form>
