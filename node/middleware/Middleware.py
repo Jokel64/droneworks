@@ -106,6 +106,11 @@ class Middleware:
             lg.error(f'Unicast message received callback function failed: {e}')
 
     def cb_mcast_message_received(self, msg: Message):
+        # Check if UID is unique:
+        if msg.get_header(DefaultHeaders.UID) == self.uid and msg.get_header(DefaultHeaders.ORIGIN_IP) != self.ip:
+            lg.error(f"{msg.get_header(DefaultHeaders.ORIGIN_IP)} has the same UID as this node! Changing own UID.")
+            self.uid = uuid.uuid1()
+
         # Update peer list
         uid = msg.get_header(DefaultHeaders.UID)
         if self.peer_list.get(uid) == None:
