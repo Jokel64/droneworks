@@ -72,7 +72,7 @@ def index_get():
                     info_port = port +  (peer.port - 5008)
 
                     buf += f"<span style=\"color:{textcolor}\">IP: <a href=\"http://{peer.ip}:{info_port}\")>{peer.ip}</a> Port:({peer.port})| Last Alive " \
-                           f"{'{:05.2f}'.format(last_alive_sec_ago)}s ago | Leader: {isleader} | UUID: {peer.uid} [{uuid.UUID(peer.uid).time}] {'[OFFLINE]' if offline else ''}</span><br>"
+                           f"{'{:05.2f}'.format(last_alive_sec_ago)}s ago | Leader: {isleader} | UUID: {peer.uid} [{uuid.UUID(peer.uid).time}] Name: {peer.readable_name} {'[OFFLINE]' if offline else ''}</span><br>"
                 val = buf
             entries += f"<tr><td>{key}</td><td>{val}</td></tr>"
         except:

@@ -26,3 +26,4 @@ class DefaultHeaders:
     UNICAST_PORT = 'port'
     UID = 'uid'
     TYPE = 'type'
+    READABLE_NAME = 'readable_name'

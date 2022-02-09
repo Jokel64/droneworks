@@ -153,7 +153,7 @@ class Middleware:
             else:
                 message_body = {"body": "not specified"}
 
-            msg = Message({DefaultHeaders.TYPE: DefaultMessageTypes.HEARTBEAT}, message_body)
+            msg = Message({DefaultHeaders.TYPE: DefaultMessageTypes.HEARTBEAT, DefaultHeaders.READABLE_NAME: self.readable_name}, message_body)
             self.r_multicast.send(msg)
             time.sleep(self.heartbeat_rate_s)
 

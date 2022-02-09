@@ -59,6 +59,8 @@ class DWNode:
         self.dash_thread = threading.Thread(target=t_dash_interface, args=(getCurrentIpAddress(), self.node_list, self.cb_new_shape_selected, self.available_shapes, ))
         self.dash_thread.start()
 
+        print(f"Node init complete. Readable Name: {self.readable_name}, IP: {self.middleware.ip}")
+
 
 
     def handler_self_elected_as_leader(self):
@@ -94,7 +96,6 @@ class DWNode:
             lg.warn(f"Got unhandeled unicast msg: {msg.header}")
 
     def cb_multicast_message_received_handler(self, msg_received: Message):
-
         if msg_received.header['type'] == DefaultMessageTypes.HEARTBEAT:
             uid = msg_received.header['uid']
             self.node_list[uid] = dict()

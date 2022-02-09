@@ -8,12 +8,13 @@ from Configuration import node_offline_timeout_s
 Information about a peer
 """
 class Peer:
-    def __init__(self, uid, origin_ip, port, **kwargs):
+    def __init__(self, uid, origin_ip, port, readable_name, **kwargs):
         self.uid = uid
         self.ip = origin_ip
         self.last_alive = time.time()
         self.heartbeats_received = 0
         self.port = port
+        self.readable_name = readable_name
 
     def __str__(self):
         buf = ""

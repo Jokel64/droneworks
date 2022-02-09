@@ -107,7 +107,7 @@ set_slave_content()
 @_app.callback(
     Output("scatter-plot", "figure"),
     [Input("interval-component", 'n_intervals')])
-def _update_bar_chart(n_intervals):
+def _update_plot(n_intervals):
     global node_list_ref
     coords = np.empty((len(node_list_ref), 3))
     counter = 0
