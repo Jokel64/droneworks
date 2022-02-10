@@ -55,6 +55,7 @@ class RMulticast:
             self.latest_deliveries[process_id_sender] += 1
             self.deliver_items_from_hb(process_id_sender, R_q+2)
             self.deliverToApplication(msg)
+            lg.info(f'done delivering to application: {msg.seq}')
 
         # This is a specialcase : if a drone looses connection it requests only the 3 missing messages
         if msg.seq > R_q + 3:

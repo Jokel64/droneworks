@@ -106,6 +106,7 @@ class Middleware:
             lg.error(f'Unicast message received callback function failed: {e}')
 
     def cb_mcast_message_received(self, msg: Message):
+        lg.info(f"msg with id {msg.seq} is now at cb_mcast type{msg.header}")
         # Check if UID is unique:
         if msg.get_header(DefaultHeaders.UID) == self.uid and msg.get_header(DefaultHeaders.ORIGIN_IP) != self.ip:
             lg.error(f"{msg.get_header(DefaultHeaders.ORIGIN_IP)} has the same UID as this node! Changing own UID.")
@@ -115,7 +116,7 @@ class Middleware:
         uid = msg.get_header(DefaultHeaders.UID)
         if self.peer_list.get(uid) == None:
             self.peer_list[uid] = Peer(**msg.header)
-            lg.info(f"Found new peer with uid {msg.get_header(DefaultHeaders.UID)} and IP {msg.get_header(DefaultHeaders.ORIGIN_IP)}")
+            lg.info(f"Found new peer with uid {msg.get_header(DefaultHeaders.UID)} and IP {msg.get_header(DefaulstHeaders.ORIGIN_IP)}")
         else:
             # todo Auch updaten, wenn die Nachricht kein HB war?
             self.peer_list[uid].update(**msg.header)
