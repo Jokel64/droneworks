@@ -46,7 +46,7 @@ class Middleware:
         # Network Interfaces
 
 
-        self.mc_sender = IPSender(MCAST_GRP, MCAST_PORT,self.unicast_port, None, self.uid)
+        self.mc_sender = IPSender(MCAST_GRP, MCAST_PORT,self.unicast_port, None, self.uid, self.cb_lost_connection)
         self.r_multicast = RMulticast(self.cb_mcast_message_received, self.mc_sender)
         self.mc_rec = IPReceiver(MCAST_GRP, MCAST_PORT, getCurrentIpAddress(), self.unicast_port,
                                         self.r_multicast.receive, self.cb_uncast_message_received)
@@ -65,6 +65,9 @@ class Middleware:
         # Start Threads
         self.heartbeat_thread.start()
         self.leader_thread.start()
+
+    def cb_lost_connection(self):
+        self.mc_rec.reset_connection()
 
     def __str__(self):
         entries = "<table>"
