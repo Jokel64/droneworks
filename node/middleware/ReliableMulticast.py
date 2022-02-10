@@ -56,8 +56,14 @@ class RMulticast:
             self.deliver_items_from_hb(process_id_sender, R_q+2)
             self.deliverToApplication(msg)
 
+        # This is a specialcase : if a drone looses connection it requests only the 3 missing messages
+        if msg.seq > R_q + 3:
+            lg.info(f"We are missing more than 3 messages only set the last 3 as missing")
+            self.latest_deliveries[process_id_sender] = msg.seq + 3
+
         if msg.seq > R_q + 1: # we have not received one or more messages
             lg.info(f'we have not recived one or more messages')
+
             self.send_negative_ack_for_seq(msg, R_q+1)
             self.hold_back_queue.append(msg)
 
