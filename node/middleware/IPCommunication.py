@@ -12,7 +12,7 @@ from Logger import lg
 
 
 class IPSender:
-    def __init__(self, multicast_addr, mcast_port, uncast_port, additional_default_headers, uid, cb_lost_connection):
+    def __init__(self, multicast_addr, mcast_port, uncast_port, additional_default_headers, uid):
         self.multicast_addr = multicast_addr
         self.mcast_port = mcast_port
         self.uncast_port = uncast_port
@@ -29,8 +29,6 @@ class IPSender:
         else:
             self.additional_default_headers = additional_default_headers
         self.uid = uid
-
-        self.cb_lost_connection = cb_lost_connection
 
     def _generate_default_header(self, destination_ip):
         return self.additional_default_headers | {DefaultHeaders.ORIGIN_IP: getCurrentIpAddress(), DefaultHeaders.UNICAST_PORT: self.uncast_port , DefaultHeaders.DESTINATION_IP: destination_ip,
@@ -51,9 +49,7 @@ class IPSender:
         try:
             self.mcast_sock.sendto(msg_str.encode(), (self.multicast_addr, self.mcast_port))
         except OSError as e:
-            lg.error(f"Error sending multicast Message: {e}. Starting new socket.")
-            self.cb_lost_connection()
-
+            lg.error(f"Error sending multicast Message: {e}")
         lg.debug(f"Message send mc: {msg_str}")
 
 
@@ -100,17 +96,9 @@ class IPReceiver:
 
             lg.debug("Reactor Running")
 
-        def reset_connection(self):
-            self.mcast_sock.close()
-            self.mcast_sock.bind(('', self.MCAST_PORT))
-
         def _t_run_mcast_receiver_loop(self, cb):
             while (not self.stopReceiving):
-                try:
-                    msg_received = self.mcast_sock.recv(10240)
-                except Exception as e:
-                    lg.error(f"Couldn't receive multicast message: {e}")
-
+                msg_received = self.mcast_sock.recv(10240)
                 msg_received = str(msg_received, encoding)
                 msg_received = json.loads(msg_received)
                 msg_received = Message(**msg_received)
