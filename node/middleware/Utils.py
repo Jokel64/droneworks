@@ -15,6 +15,10 @@ def getCurrentIpAddress():
 def getNextFreePort():
     # Init Uncast socket
 
+    return UNCAST_PORT
+
+    #To disable the dynamic port allocation rmove line 18
+
     portSearch = UNCAST_PORT
 
     while portSearch <= UNCAST_PORT+100:

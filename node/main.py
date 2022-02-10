@@ -26,7 +26,8 @@ port=3300
 
 def getNextFreePort():
     # Init Uncast socket
-
+    return port
+    # To enable dynamic Port allication remove line 29
     portSearch = port
 
     while portSearch <= port+100:
