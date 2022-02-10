@@ -85,7 +85,7 @@ class IPReceiver:
             self.mcast_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
             # Init Uncast socket
-            self.uncast_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.uncast_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.uncast_sock.bind((self.UNCAST_ADDR, self.UNCAST_PORT))
 
             # Start Threads
