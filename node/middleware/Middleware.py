@@ -116,7 +116,7 @@ class Middleware:
         uid = msg.get_header(DefaultHeaders.UID)
         if self.peer_list.get(uid) == None:
             self.peer_list[uid] = Peer(**msg.header)
-            lg.info(f"Found new peer with uid {msg.get_header(DefaultHeaders.UID)} and IP {msg.get_header(DefaulstHeaders.ORIGIN_IP)}")
+            lg.info(f"Found new peer with uid {msg.get_header(DefaultHeaders.UID)} and IP {msg.get_header(DefaultHeaders.ORIGIN_IP)}")
         else:
             # todo Auch updaten, wenn die Nachricht kein HB war?
             self.peer_list[uid].update(**msg.header)
