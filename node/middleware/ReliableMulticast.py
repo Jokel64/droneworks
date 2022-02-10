@@ -51,7 +51,7 @@ class RMulticast:
         R_q = self.get_sequence_number_for_process(process_id_sender, msg.seq)
 
         if msg.seq == R_q + 1: # msg is in order
-            #lg.info(f'msg in order delivering to application: {msg.seq}')
+            lg.info(f'msg in order delivering to application: {msg.seq}')
             self.latest_deliveries[process_id_sender] += 1
             self.deliver_items_from_hb(process_id_sender, R_q+2)
             self.deliverToApplication(msg)
