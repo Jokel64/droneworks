@@ -46,7 +46,7 @@ class RMulticast:
         self.ip_sender.send_message_multicast(message)  # Send Message
 
     def receive(self, msg: Message):
-        lg.info(f'recived multicast msg with sqe: {msg.seq} | {msg.header}')
+        #lg.info(f'recived multicast msg with sqe: {msg.seq} | {msg.header}')
         process_id_sender = msg.header[DefaultHeaders.UID]
         R_q = self.get_sequence_number_for_process(process_id_sender, msg.seq)
 
